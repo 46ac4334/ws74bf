@@ -18,10 +18,9 @@ package package18;
 		}
 
 		/**
-		 * 
+		 * constructor
 		 */
 		public Explore18() {
-			// TODO Auto-generated constructor stub
 		}
 
 		@Override
@@ -30,3 +29,4 @@ package package18;
 		}
 
 	}
+	
