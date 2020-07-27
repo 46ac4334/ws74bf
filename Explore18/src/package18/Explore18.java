@@ -30,5 +30,3 @@ package package18;
 		}
 
 	}
-
-
