@@ -3,6 +3,8 @@ package package18;
 
 	import javax.swing.JOptionPane;
 
+import org.apache.commons.math3.linear.ArrayRealVector;
+
 	/**
 	 * @author bakis
 	 *
@@ -23,9 +25,12 @@ package package18;
 		public Explore18() {
 		}
 
+		
 		@Override
 		public void run() {
 			JOptionPane.showMessageDialog(null, "Hello, World!  Hello");
+			ArrayRealVector arrayRealVector = new ArrayRealVector(7);
+			System.out.println(arrayRealVector);
 		}
 
 	}
