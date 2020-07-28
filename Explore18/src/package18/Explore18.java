@@ -26,7 +26,7 @@ package package18;
 
 		@Override
 		public void run() {
-			JOptionPane.showMessageDialog(null, "Hello, World!");
+			JOptionPane.showMessageDialog(null, "Hello, World!  Hello");
 		}
 
 	}
