@@ -45,12 +45,12 @@ import java.util.function.Function;
  */
 public class GaussianMixtureLogLikelihood implements Function<Double, double[]> {
 
-	private final double[] means;
-
 	/**
 	 * Number of components
 	 */
-	private final int n;
+	private final int componentCount;
+
+	private final double[] means;
 
 	private final double[] sigmas;
 
@@ -59,11 +59,11 @@ public class GaussianMixtureLogLikelihood implements Function<Double, double[]> 
 	/**
 	 * Constructor.
 	 *
-	 * @param params <code>params[i][0</code>] must contain the mean,
-	 *               <code>params[i][1]</code> the sigma, and
-	 *               <code>params[i][2]</code> the weight for the <code>i</code>-th
-	 *               mixture component. Does not force the sum of weights to be
-	 *               unity.
+	 * @param params element <code>[i][0</code>] must contain the mean,
+	 *               <code>[i][1]</code> the sigma, and <code>[i][2]</code> the
+	 *               weight for the <code>i</code>-th mixture component. Does not
+	 *               force the sum of weights to be unity, but all weights must be
+	 *               non-negative.
 	 */
 	public GaussianMixtureLogLikelihood(final double[][] params) {
 		if (params == null) {
@@ -73,19 +73,23 @@ public class GaussianMixtureLogLikelihood implements Function<Double, double[]> 
 			throw new IllegalArgumentException("argument array is empty");
 		}
 
-		this.n = params.length;
+		this.componentCount = params.length;
 
-		this.means = new double[this.n];
-		this.sigmas = new double[this.n];
-		this.weights = new double[this.n];
+		this.means = new double[this.componentCount];
+		this.sigmas = new double[this.componentCount];
+		this.weights = new double[this.componentCount];
 
-		for (var i = 0; i < this.n; ++i) {
+		for (var i = 0; i < this.componentCount; ++i) {
 			if (params[i] == null) {
 				throw new IllegalArgumentException(String.format("row %,d of argument is null", i));
 			}
 			if (params[i].length == 3) {
 				this.means[i] = params[i][0];
 				this.sigmas[i] = params[i][1];
+				if (params[i][2] < 0) {
+					throw new IllegalArgumentException(
+							String.format("params[%,d][2] = %.3g, should be non-negative", i, params[i][2]));
+				}
 				this.weights[i] = params[i][2];
 			} else {
 				throw new IllegalArgumentException(
@@ -97,36 +101,40 @@ public class GaussianMixtureLogLikelihood implements Function<Double, double[]> 
 	}
 
 	/**
-	 *
+	 * @param x The argument for the Gaussian mixture.
+	 * @return array of two elements: the logarithm of the Gassian-mixture density
+	 *         function, and the derivative of that function w.r.t. the argument x.
 	 */
 	@Override
 	public double[] apply(final Double x) {
-		final var y = 0D;
+		if (!Double.isFinite(x)) {
+			throw new IllegalArgumentException(String.format("argument is %.3g", x));
+		}
 		var sum = 0D;
-		for (var i = 0; i < this.n; ++i) { // . . . . . . . . . . . . . .Step 1 forward
+		for (var i = 0; i < this.componentCount; ++i) { // . . . . . . . Step 1 forward
 			final var t = (x - this.means[i]) / this.sigmas[i]; // . . . Step 2 forward
 			final var exponent = -t * t / 2; // . . . . . . . . . . . . .Step 3 forward
 			final var exp = Math.exp(exponent); // . . . . . . . . . . . Step 4 forward
 			sum += this.weights[i] * exp / this.sigmas[i]; // . . . . . .Step 5 forward
 		} // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Step 6 forward
-		final var a = sum / Math.sqrt(2. * Math.PI); // . . . . . . . . .Step 7 forward
+		final var f = sum / Math.sqrt(2. * Math.PI); // . . . . . . . . .Step 7 forward
 
-		final var f = Math.log(a); // . . . . . . . . . . . . . . . . . .Step 8 forward
+		final var y = Math.log(f); // . . . . . . . . . . . . . . . . . .Step 8 forward
 
-		final var f_ = 1.; // . . . . . . . . . . . . . . . . . . . . . .Step 9 reverse
+		final var y_ = 1.; // . . . . . . . . . . . . . . . . . . . . . .Step 9 reverse
 		// In a network, this might be the derivative of the overall objective w.r.t.
-							// the output of this node. Here it is set to unity.
+		// the output of this node. Here it is set to unity.
 
-		final var a_ = f_ / a; // . . . . . . . . . . . . . . . . . . . .Step 8 reverse
+		final var a_ = y_ / f; // . . . . . . . . . . . . . . . . . . . .Step 8 reverse
 
 		final var sum_ = a_ / Math.sqrt(2. * Math.PI); // . . . . . . . .Step 7 reverse
 
 		var x_ = 0D;
 
-		for (var i = this.n - 1; i >= 0; --i) { //. . . . . . . . . . . .Step 6 reverse
+		for (var i = this.componentCount - 1; i >= 0; --i) { // . . . . .Step 6 reverse
 
-			// The following three duplicate statements could be avoided if t, exponent, and
-			// exp were saved from the forward pass
+			// The following three duplicate statements could be eliminated if "t",
+			// "exponent", and "exp" were saved from the forward pass.
 			final var t = (x - this.means[i]) / this.sigmas[i]; // . . . Step 2 dup
 			final var exponent = -t * t / 2; // . . . . . . . . . . . . .Step 3 dup
 			final var exp = Math.exp(exponent); // . . . . . . . . . . . Step 4 dup
@@ -137,7 +145,7 @@ public class GaussianMixtureLogLikelihood implements Function<Double, double[]> 
 			x_ += t_ / this.sigmas[i]; // . . . . . . . . . . . . . . . .Step 2 reverse
 		} // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Step 1 reverse
 
-		return new double[] { f, x_ };
+		return new double[] { y, x_ };
 	}
 
 }
