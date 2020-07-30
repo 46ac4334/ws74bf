@@ -118,7 +118,6 @@ public class GaussianMixtureLogLikelihood implements Function<Double, double[]> 
 			sum += this.weights[i] * exp / this.sigmas[i]; // . . . . . .Step 5 forward
 		} // . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Step 6 forward
 		final var f = sum / Math.sqrt(2. * Math.PI); // . . . . . . . . .Step 7 forward
-
 		final var y = Math.log(f); // . . . . . . . . . . . . . . . . . .Step 8 forward
 
 		final var y_ = 1.; // . . . . . . . . . . . . . . . . . . . . . .Step 9 reverse
@@ -126,15 +125,16 @@ public class GaussianMixtureLogLikelihood implements Function<Double, double[]> 
 		// the output of this node. Here it is set to unity.
 
 		final var a_ = y_ / f; // . . . . . . . . . . . . . . . . . . . .Step 8 reverse
-
 		final var sum_ = a_ / Math.sqrt(2. * Math.PI); // . . . . . . . .Step 7 reverse
-
 		var x_ = 0D;
-
 		for (var i = this.componentCount - 1; i >= 0; --i) { // . . . . .Step 6 reverse
 
-			// The following three duplicate statements could be eliminated if "t",
-			// "exponent", and "exp" were saved from the forward pass.
+			/*
+			 * There is a trade-off between compute cycles and storage: The following three
+			 * statements, which re-compute the values of "t", "exponent", and "exp", become
+			 * unnecessary if a these values are stored during the forward pass for every
+			 * needed value of "i".
+			 */
 			final var t = (x - this.means[i]) / this.sigmas[i]; // . . . Step 2 dup
 			final var exponent = -t * t / 2; // . . . . . . . . . . . . .Step 3 dup
 			final var exp = Math.exp(exponent); // . . . . . . . . . . . Step 4 dup
