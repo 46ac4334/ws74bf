@@ -7,21 +7,27 @@ import java.io.File;
  *
  */
 public class Explore18 implements Runnable {
+	private static final String CONFIRMED_GLOBAL_FILE_NAME = "time_series_covid19_confirmed_global.csv";
+
+	private static final String CONFIRMED_US_FILE_NAME = "time_series_covid19_confirmed_US.csv";
+
 	/**
 	 * Name of directory containing the data files in the git repository
 	 */
-	private static final String dataDirName = "csse_covid_19_data";
+	private static final String DATA_DIR_NAME = "csse_covid_19_data";
 
+	private static final String DEATHS_GLOBAL_FILE_NAME = "time_series_covid19_deaths_global.csv";
+	private static final String DEATHS_US_FILE_NAME = "time_series_covid19_deaths_US.csv";
+	private static final String RECOVERED_GLOBAL_FILE_NAME = "time_series_covid19_recovered_global.csv";
 	/**
 	 * The name of the git repository containing the data for this application.
 	 */
-	private static final String repositoryName = "COVID-19";
-
+	private static final String REPOSITORY_NAME = "COVID-19";
 	/**
 	 * Name of the directory containing the time series files within the "data"
 	 * directory within the repository.
 	 */
-	private static final String timeSeriesDirName = "csse_covid_19_time_series";
+	private static final String TIME_SERIES_DIR_NAME = "csse_covid_19_time_series";
 
 	/**
 	 * @param args
@@ -60,7 +66,7 @@ public class Explore18 implements Runnable {
 		if (!gitDir.canRead()) {
 			throw new RuntimeException("Unable to read git directory " + gitDir);
 		}
-		final var repository = new File(gitDir, Explore18.repositoryName);
+		final var repository = new File(gitDir, Explore18.REPOSITORY_NAME);
 		if (!repository.exists()) {
 			throw new RuntimeException("Repository not found:  " + repository);
 		}
@@ -68,7 +74,7 @@ public class Explore18 implements Runnable {
 			throw new RuntimeException("Unable to read repository " + repository);
 		}
 
-		final var dataDir = new File(repository, Explore18.dataDirName);
+		final var dataDir = new File(repository, Explore18.DATA_DIR_NAME);
 		if (!dataDir.exists()) {
 			throw new RuntimeException("data directory not found:  " + dataDir);
 		}
@@ -76,7 +82,7 @@ public class Explore18 implements Runnable {
 			throw new RuntimeException("Unable to read data directory " + dataDir);
 		}
 
-		final var timeSeriesDir = new File(dataDir, Explore18.timeSeriesDirName);
+		final var timeSeriesDir = new File(dataDir, Explore18.TIME_SERIES_DIR_NAME);
 		if (!timeSeriesDir.exists()) {
 			throw new RuntimeException("timeSeries directory not found:  " + timeSeriesDir);
 		}
@@ -90,11 +96,41 @@ public class Explore18 implements Runnable {
 	public void run() {
 		final var timeSeriesDir = this.getDataFolder();
 
-		final var list1 = timeSeriesDir.listFiles();
-		System.out.format("%n%,d files in timeSeries folder:%n", list1.length);
-		for (final File s : list1) {
-			System.out.println(s);
+		final var confirmedGlobalFile = new File(timeSeriesDir, Explore18.CONFIRMED_GLOBAL_FILE_NAME);
+		if (confirmedGlobalFile.canRead()) {
+			System.out.println("✔ Confirmed Global file found.");
+		} else {
+			System.out.println("🗙 Confirmed Global file NOT found.");
 		}
+
+		final var confirmedUSFile = new File(timeSeriesDir, Explore18.CONFIRMED_US_FILE_NAME);
+		if (confirmedUSFile.canRead()) {
+			System.out.println("✔ Confirmed US file found.");
+		} else {
+			System.out.println("🗙 Confirmed US file NOT found.");
+		}
+
+		final var deathsGlobalFile = new File(timeSeriesDir, Explore18.DEATHS_GLOBAL_FILE_NAME);
+		if (deathsGlobalFile.canRead()) {
+			System.out.println("✔ Deaths Global file found.");
+		} else {
+			System.out.println("🗙 Deaths Global file NOT found.");
+		}
+
+		final var deathsUSFile = new File(timeSeriesDir, Explore18.DEATHS_US_FILE_NAME);
+		if (deathsUSFile.canRead()) {
+			System.out.println("✔ Deaths US file found.");
+		} else {
+			System.out.println("🗙 Deaths US file NOT found.");
+		}
+
+		final var recoveredGlobalFile = new File(timeSeriesDir, Explore18.RECOVERED_GLOBAL_FILE_NAME);
+		if (recoveredGlobalFile.canRead()) {
+			System.out.println("✔ Recovered Global file found.");
+		} else {
+			System.out.println("🗙 Recovered Global file NOT found.");
+		}
+
 	}
 
 }
