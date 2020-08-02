@@ -14,7 +14,9 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,21 +43,13 @@ import org.apache.commons.csv.CSVRecord;
  * @author bakis
  *
  */
-public class Explore18 extends JFrame implements Runnable {
+public class TrackCovid19 extends JFrame implements Runnable {
 	private class ControlPanel extends JInternalFrame {
 
 		/**
 		 *
 		 */
 		private static final long serialVersionUID = 1L;
-
-		/**
-		 * Constructor.
-		 */
-		public ControlPanel() {
-
-			this.init();
-		}
 
 		public ControlPanel(final String string) {
 			super(string);
@@ -134,9 +128,10 @@ public class Explore18 extends JFrame implements Runnable {
 		/**
 		 * @param text
 		 */
-		public JButton2(final String text) {
+		public JButton2(final String text, final char charOn, final char charOff) {
 			super(text);
-			this.addActionListener(e -> Explore18.this.buttonPushed((this.isSelected() ? "+" : "-") + text));
+			this.addActionListener(
+					e -> TrackCovid19.this.countryButtonPushed((this.isSelected() ? charOn : charOff) + text));
 		}
 
 	}
@@ -188,7 +183,7 @@ public class Explore18 extends JFrame implements Runnable {
 	 * @param args
 	 */
 	public static void main(final String[] args) {
-		final var app = new Explore18();
+		final var app = new TrackCovid19();
 //		Plotter6165i.setRoundrangeDebug(false);
 		EventQueue.invokeLater(app);
 	}
@@ -225,7 +220,7 @@ public class Explore18 extends JFrame implements Runnable {
 	private final JDesktopPane desktop = new JDesktopPane();
 
 	/**
-	 * The background color for the tabletop: a dull corkboard color:
+	 * The background color for the table-top: a dull cork-board color:
 	 */
 	private final Color desktopColor = Color.getHSBColor(0.1f, 0.25f, 0.8f);
 
@@ -236,9 +231,15 @@ public class Explore18 extends JFrame implements Runnable {
 
 	private Map<String, Integer> lookupheaderMap;
 
+	@SuppressWarnings("unused")
 	private List<CSVRecord> lookupRecords;
 
 	private final File lookupTable;
+
+	/**
+	 * The currently visible, active province windows
+	 */
+	private final Set<ControlPanel> provinceWindows = new HashSet<>();
 
 	private final File recoveredGlobalFile;
 
@@ -251,12 +252,14 @@ public class Explore18 extends JFrame implements Runnable {
 	 */
 	private final JScrollPane scrollPane;
 
+	private Map<String, List<Long>> stateNames;
+
 	private final File timeSeriesDir;
 
 	/**
 	 * constructor
 	 */
-	public Explore18() {
+	public TrackCovid19() {
 
 		if (GraphicsEnvironment.isHeadless()) {
 			throw new RuntimeException("This application requires a display.");
@@ -274,7 +277,7 @@ public class Explore18 extends JFrame implements Runnable {
 		} else {
 			this.setPreferredSize(new Dimension(1200, 800));
 		}
-		this.setIconImage(Explore18.iconImage);
+		this.setIconImage(TrackCovid19.iconImage);
 		this.setTitle("COVID-19 Statistics");
 		this.desktop.setPreferredSize(new Dimension(1800, 4000));
 		this.desktop.setBackground(this.desktopColor);
@@ -296,35 +299,35 @@ public class Explore18 extends JFrame implements Runnable {
 
 		this.timeSeriesDir = this.getDataFolder();
 
-		this.confirmedGlobalFile = new File(this.timeSeriesDir, Explore18.CONFIRMED_GLOBAL_FILE_NAME);
+		this.confirmedGlobalFile = new File(this.timeSeriesDir, TrackCovid19.CONFIRMED_GLOBAL_FILE_NAME);
 		if (this.confirmedGlobalFile.canRead()) {
 			System.out.println("✔ Confirmed Global file found. " + new Date(this.confirmedGlobalFile.lastModified()));
 		} else {
 			System.out.println("🗙 Confirmed Global file NOT found.");
 		}
 
-		this.confirmedUSFile = new File(this.timeSeriesDir, Explore18.CONFIRMED_US_FILE_NAME);
+		this.confirmedUSFile = new File(this.timeSeriesDir, TrackCovid19.CONFIRMED_US_FILE_NAME);
 		if (this.confirmedUSFile.canRead()) {
 			System.out.println("✔ Confirmed US file found.     " + new Date(this.confirmedUSFile.lastModified()));
 		} else {
 			System.out.println("🗙 Confirmed US file NOT found.");
 		}
 
-		this.deathsGlobalFile = new File(this.timeSeriesDir, Explore18.DEATHS_GLOBAL_FILE_NAME);
+		this.deathsGlobalFile = new File(this.timeSeriesDir, TrackCovid19.DEATHS_GLOBAL_FILE_NAME);
 		if (this.deathsGlobalFile.canRead()) {
 			System.out.println("✔ Deaths Global file found.    " + new Date(this.deathsGlobalFile.lastModified()));
 		} else {
 			System.out.println("🗙 Deaths Global file NOT found.");
 		}
 
-		this.deathsUSFile = new File(this.timeSeriesDir, Explore18.DEATHS_US_FILE_NAME);
+		this.deathsUSFile = new File(this.timeSeriesDir, TrackCovid19.DEATHS_US_FILE_NAME);
 		if (this.deathsUSFile.canRead()) {
 			System.out.println("✔ Deaths US file found.        " + new Date(this.deathsUSFile.lastModified()));
 		} else {
 			System.out.println("🗙 Deaths US file NOT found.");
 		}
 
-		this.recoveredGlobalFile = new File(this.timeSeriesDir, Explore18.RECOVERED_GLOBAL_FILE_NAME);
+		this.recoveredGlobalFile = new File(this.timeSeriesDir, TrackCovid19.RECOVERED_GLOBAL_FILE_NAME);
 		if (this.recoveredGlobalFile.canRead()) {
 			System.out.println("✔ Recovered Global file found. " + new Date(this.recoveredGlobalFile.lastModified()));
 		} else {
@@ -391,17 +394,17 @@ public class Explore18 extends JFrame implements Runnable {
 		final var popup = new JPopupMenu();
 
 		final var arrangeItem = new JMenuItem("Arrange");
-		arrangeItem.addActionListener(e -> Explore18.this.arrangeWindows());
+		arrangeItem.addActionListener(e -> TrackCovid19.this.arrangeWindows());
 		popup.add(arrangeItem);
 
 		final var minimizeItem = new JMenuItem("Minimize");
-		minimizeItem.addActionListener(e -> Explore18.this.minimize());
+		minimizeItem.addActionListener(e -> TrackCovid19.this.minimize());
 		popup.add(minimizeItem);
 
 		popup.addSeparator();
 
 		final var quitItem = new JMenuItem("Quit");
-		quitItem.addActionListener(e -> Explore18.this.shutdown());
+		quitItem.addActionListener(e -> TrackCovid19.this.shutdown());
 		popup.add(quitItem);
 		return popup;
 	}
@@ -411,15 +414,101 @@ public class Explore18 extends JFrame implements Runnable {
 	 *
 	 * @param text
 	 */
-	private void buttonPushed(final String text) {
-		System.out.println(text);
-		if (text.startsWith("+")) {
-			final var recordIndices = this.countryNames.get(text.substring(1));
-			for (final Long l : recordIndices) {
-				System.out.format("%,8d", l);
+	private void countryButtonPushed(final String text) {
+		final var buttonText = text.substring(1);
+
+		// The first character of text is a code indicating the type of button and
+		// action
+
+		final var firstChar = text.charAt(0);
+
+		switch (firstChar) {
+		case '+':// selected country button
+			final var recordIndices = this.countryNames.get(buttonText);
+			if (recordIndices == null) {
+				return;
 			}
+			System.out.format("selected country %s%n", buttonText);
+
+			if (recordIndices.size() > 1) {// If there is more than one province
+				final var showProvinces = this.showProvinces(recordIndices, this.confirmedGlobalRecords);
+				showProvinces.setName(buttonText);
+				this.provinceWindows.add(showProvinces);
+			} else if (buttonText.equalsIgnoreCase("US")) {
+				final var showStates = this.showStates(this.confirmedUSRecords, buttonText);
+				showStates.setName(buttonText);
+				this.provinceWindows.add(showStates);
+			}
+			break;
+		case '-':// deselected country button
+			System.out.format("de-selected country %s%n", buttonText);
+			final Set<ControlPanel> delenda = new HashSet<>();
+			for (final ControlPanel w : this.provinceWindows) {
+				if (w.getName().equalsIgnoreCase(buttonText)) {
+					delenda.add(w);
+				}
+			}
+			for (final ControlPanel d : delenda) {
+				this.provinceWindows.remove(d);
+				d.dispose();
+			}
+			break;
+		case '0':// selected state button
+			System.out.format("selected state %s%n", buttonText);
+			break;
+		case '1':// de-selected state button
+			System.out.format("de-selected state %s%n", buttonText);
+			break;
+		case '2':// selected county button
+			System.out.format("selected county %s%n", buttonText);
+			break;
+		case '3':// de-selected county button
+			System.out.format("de-selected county %s%n", buttonText);
+			break;
+		case '4':// selected province button
+			System.out.format("selected province %s%n", buttonText);
+			break;
+		case '5':// de-selected province button
+			System.out.format("de-selected province %s%n", buttonText);
+			break;
+		default:
+			throw new RuntimeException("unimplemented case:  '" + firstChar + "' " + buttonText);
 		}
-		System.out.println();
+
+//		if (text.startsWith("+")) {// If country button is now selected
+//			final var recordIndices = this.countryNames.get(buttonText);
+//			if (recordIndices == null) {
+//				return;
+//			}
+//			if (recordIndices.size() > 1) {// If there is more than one province
+//				final var showProvinces = this.showProvinces(recordIndices, this.confirmedGlobalRecords);
+//				showProvinces.setName(buttonText);
+//				this.provinceWindows.add(showProvinces);
+//			} else if (buttonText.equalsIgnoreCase("US")) {
+//				final var showStates = this.showStates(this.confirmedUSRecords, buttonText);
+//				showStates.setName(buttonText);
+//				this.provinceWindows.add(showStates);
+//			}
+//
+//		} else
+//
+//		{// if country button is deselected
+//
+//			/*
+//			 * If country button is de-selected, remove the provinces window.
+//			 */
+//			final Set<ControlPanel> delenda = new HashSet<>();
+//			for (final ControlPanel w : this.provinceWindows) {
+//				if (w.getName().equalsIgnoreCase(buttonText)) {
+//					delenda.add(w);
+//				}
+//			}
+//			for (final ControlPanel d : delenda) {
+//				this.provinceWindows.remove(d);
+//				d.dispose();
+//			}
+//		}
+
 	}
 
 	/**
@@ -466,7 +555,7 @@ public class Explore18 extends JFrame implements Runnable {
 		if (!gitDir.canRead()) {
 			throw new RuntimeException("Unable to read git directory " + gitDir);
 		}
-		final var repository = new File(gitDir, Explore18.REPOSITORY_NAME);
+		final var repository = new File(gitDir, TrackCovid19.REPOSITORY_NAME);
 		if (!repository.exists()) {
 			throw new RuntimeException("Repository not found:  " + repository);
 		}
@@ -474,7 +563,7 @@ public class Explore18 extends JFrame implements Runnable {
 			throw new RuntimeException("Unable to read repository " + repository);
 		}
 
-		final var dataDir = new File(repository, Explore18.DATA_DIR_NAME);
+		final var dataDir = new File(repository, TrackCovid19.DATA_DIR_NAME);
 		if (!dataDir.exists()) {
 			throw new RuntimeException("data directory not found:  " + dataDir);
 		}
@@ -482,7 +571,7 @@ public class Explore18 extends JFrame implements Runnable {
 			throw new RuntimeException("Unable to read data directory " + dataDir);
 		}
 
-		final var timeSeriesDir = new File(dataDir, Explore18.TIME_SERIES_DIR_NAME);
+		final var timeSeriesDir = new File(dataDir, TrackCovid19.TIME_SERIES_DIR_NAME);
 		if (!timeSeriesDir.exists()) {
 			throw new RuntimeException("timeSeries directory not found:  " + timeSeriesDir);
 		}
@@ -490,6 +579,26 @@ public class Explore18 extends JFrame implements Runnable {
 			throw new RuntimeException("Unable to read timeSeries directory " + gitDir);
 		}
 		return timeSeriesDir;
+	}
+
+	/**
+	 * @param headerMap
+	 * @param records
+	 * @return Map in which the key is a country name and the value is a set of row
+	 *         indices containing that country name.
+	 */
+	private Map<String, List<Long>> getStateNames(final Map<String, Integer> headerMap, final List<CSVRecord> records) {
+		final var columnIndex = headerMap.get("Province_State");
+		final Map<String, List<Long>> result = new TreeMap<>();
+		for (final CSVRecord r : records) {
+			final var rowIndex = r.getRecordNumber();
+			final var stateName = r.get(columnIndex);
+
+			final var value = result.containsKey(stateName) ? result.get(stateName) : new ArrayList<Long>();
+			value.add(rowIndex);
+			result.put(stateName, value);
+		}
+		return result;
 	}
 
 	private void minimize() {
@@ -500,7 +609,7 @@ public class Explore18 extends JFrame implements Runnable {
 		System.out.format("%5s %s%n", "value", "key");
 		System.out.format("%5s %s%n", "\u2500\u2500\u2500\u2500\u2500", "\u2500\u2500\u2500");
 		for (final String key : headerMap.keySet()) {
-			if (!key.matches(Explore18.datePattern)) {
+			if (!key.matches(TrackCovid19.datePattern)) {
 				System.out.format("%,5d %s%n", headerMap.get(key), key);
 			} else {
 				System.out.format("%5s %s%n", "\u2022", " ");
@@ -521,7 +630,7 @@ public class Explore18 extends JFrame implements Runnable {
 		countryButtons.setTitle("Countries");
 		final var countryButtonsPanel = new JPanel();
 		countryButtonsPanel.setLayout(new FlowLayout());
-		final var label = new JLabel("Choose a Country");
+		final var label = new JLabel("Countries");
 		label.setPreferredSize(new Dimension(850, 55));
 		label.setFont(label.getFont().deriveFont(42f));
 		label.setHorizontalAlignment(SwingConstants.CENTER);
@@ -555,8 +664,11 @@ public class Explore18 extends JFrame implements Runnable {
 
 		this.countryNames = this.getCountryNames(this.confirmedGlobalheaderMap, this.confirmedGlobalRecords);
 		for (final String country : this.countryNames.keySet()) {
-			countryButtonsPanel.add(new JButton2(country));
+			countryButtonsPanel.add(new JButton2(country, '+', '-'));
 		}
+
+		this.stateNames = this.getStateNames(this.confirmedUSheaderMap, this.confirmedUSRecords);
+
 	}
 
 	/**
@@ -581,6 +693,92 @@ public class Explore18 extends JFrame implements Runnable {
 						.setValue((int) (verticalScrollBar.getValue() + blockIncrement * preciseWheelRotation));
 			}
 		});
+	}
+
+	/**
+	 * Invoked when a country has more than one province.
+	 *
+	 * @param recordIndices indices of all records for the selected country.
+	 * @return
+	 */
+	private ControlPanel showProvinces(final Set<Long> recordIndices, final List<CSVRecord> records) {
+		final var provinceButtons = new ControlPanel("Select Province");
+		this.desktop.add(provinceButtons);
+		provinceButtons.setPreferredSize(new Dimension(460, 600));
+		provinceButtons.setResizable(false);
+		final var iterator = recordIndices.iterator();
+		if (!iterator.hasNext()) {
+			throw new RuntimeException("Internal error:  recordIndices is empty");
+		}
+		final Long index = iterator.next() - 1;
+		final var csvRecord = records.get(index.intValue());
+		final var countryName = csvRecord.get("Country/Region");
+		final var title = "Provinces of " + countryName;
+		provinceButtons.setTitle(title);
+		final var provinceButtonsPanel = new JPanel();
+		provinceButtonsPanel.setLayout(new FlowLayout());
+		final var label = new JLabel(title);
+		label.setPreferredSize(new Dimension(450, 55));
+		label.setFont(label.getFont().deriveFont(30f));
+		label.setHorizontalAlignment(SwingConstants.CENTER);
+		provinceButtonsPanel.add(label);
+		final var provinceName = csvRecord.get("Province/State");
+		final var name1a = provinceName.isEmpty() ? countryName : provinceName;
+		provinceButtonsPanel.add(new JButton2(name1a, '4', '5'));
+		provinceButtons.setContentPane(provinceButtonsPanel);
+		while (iterator.hasNext()) {
+			final var recordIndex1 = iterator.next().intValue() - 1;
+			final var csvRecord2 = records.get(recordIndex1);
+			final var name1 = csvRecord2.get("Province/State");
+			final var name1b = name1.isEmpty() ? countryName : name1;
+			provinceButtonsPanel.add(new JButton2(name1b, '4', '5'));
+		}
+		provinceButtons.pack();
+		provinceButtons.setVisible(true);
+		this.arrangeWindows();
+		return provinceButtons;
+	}
+
+	/**
+	 * @param records     Records of confirmed US file
+	 * @param countryName
+	 * @return
+	 */
+	private ControlPanel showStates(final List<CSVRecord> records, final String countryName) {
+		if (!"US".contentEquals(countryName)) {
+			throw new RuntimeException("Internal error:  country name is not \"US\"");
+		}
+		final var stateButtons = new ControlPanel("Select State");
+		this.desktop.add(stateButtons);
+		stateButtons.setPreferredSize(new Dimension(460, 600));
+		stateButtons.setResizable(false);
+		final var iterator = this.stateNames.keySet().iterator();
+		if (!iterator.hasNext()) {
+			throw new RuntimeException("Internal error:  stateNames is empty");
+		}
+
+		final var title = "States of " + countryName;
+		stateButtons.setTitle(title);
+		final var stateButtonsPanel = new JPanel();
+		stateButtons.setContentPane(stateButtonsPanel);
+		stateButtonsPanel.setLayout(new FlowLayout());
+		final var label = new JLabel(title);
+		label.setPreferredSize(new Dimension(450, 55));
+		label.setFont(label.getFont().deriveFont(30f));
+		label.setHorizontalAlignment(SwingConstants.CENTER);
+		stateButtonsPanel.add(label);
+
+		while (iterator.hasNext()) {
+			final var stateName = iterator.next();
+			final var name1a = stateName.isEmpty() ? countryName : stateName;
+			stateButtonsPanel.add(new JButton2(name1a, '0', '1'));
+		}
+
+		stateButtons.pack();
+		stateButtons.setVisible(true);
+		this.arrangeWindows();
+		return stateButtons;
+
 	}
 
 	private void shutdown() {
