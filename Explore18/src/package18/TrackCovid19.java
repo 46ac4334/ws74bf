@@ -8,20 +8,25 @@ import java.awt.Font;
 import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
 import java.awt.Image;
+import java.awt.Toolkit;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.image.BufferedImage;
+import java.beans.PropertyVetoException;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.Vector;
 
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
@@ -32,6 +37,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JToggleButton;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
@@ -44,6 +50,15 @@ import org.apache.commons.csv.CSVRecord;
  *
  */
 public class TrackCovid19 extends JFrame implements Runnable {
+
+	public enum ADMIN {
+		country, county, province, state
+	}
+
+	/**
+	 * @author bakis
+	 *
+	 */
 	private class ControlPanel extends JInternalFrame {
 
 		/**
@@ -51,7 +66,13 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 */
 		private static final long serialVersionUID = 1L;
 
-		public ControlPanel(final String string) {
+		/**
+		 * @param string
+		 * @param parent The button which caused this panel to be displayed. Should be
+		 *               <code>null</code> if the panel was not created in response to a
+		 *               button action.
+		 */
+		public ControlPanel(final String string, final JButton2 parent) {
 			super(string);
 			this.init();
 		}
@@ -121,20 +142,152 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @author bakis
 	 *
 	 */
-	public class JButton2 extends JToggleButton {
+	public class JButton2 extends JToggleButton implements Comparable<JButton2> {
 
 		private static final long serialVersionUID = 1L;
 
+		private final ADMIN admin;
+
 		/**
-		 * @param text
+		 * The panel on which this button is displayed
 		 */
-		public JButton2(final String text, final char charOn, final char charOff) {
+		private final ControlPanel parentPanel;
+
+		private final JPopupMenu popup = new JPopupMenu();
+
+		/**
+		 * <p>
+		 * The only public constructor.
+		 * </p>
+		 * <p>
+		 * The button has a built-in {@link java.awt.event#ActionListener} which invokes
+		 * {@link TrackCovid19#button2Action(String, ControlPanel)}, passing to it the
+		 * text prefixed with the <code>charOn</code> or <code>charOff</code> character
+		 * depending on whether this action turned the button on or off.
+		 * </p>
+		 *
+		 * @param text    Text to appear on the button
+		 * @param charOn  The prefix to the text indicating the button is selected
+		 * @param charOff The prefix to the text indicating the button is not selected
+		 * @param parent  The ControlPanel object on which this button appears.
+		 * @param adm     The type of the administrative region.
+		 */
+		public JButton2(final String text, final char charOn, final char charOff, final ControlPanel parent,
+				final ADMIN adm) {
 			super(text);
+			this.admin = adm;
+			this.setToolTipText(this.admin.toString());
+			this.parentPanel = parent;
 			this.addActionListener(
-					e -> TrackCovid19.this.countryButtonPushed((this.isSelected() ? charOn : charOff) + text));
+					e -> TrackCovid19.this.button2Action((this.isSelected() ? charOn : charOff) + text, this));
+
+			this.setComponentPopupMenu(this.popup);
+			final var menuItem = new JMenuItem("Add to pool");
+			menuItem.addActionListener(e -> TrackCovid19.this.addToPool(JButton2.this));
+			this.popup.add(menuItem);
+			final var menuItem2 = new JMenuItem("Remove from pool");
+			menuItem2.addActionListener(e -> TrackCovid19.this.removeFromPool(JButton2.this));
+			this.popup.add(menuItem2);
+
+		}
+
+		@Override
+		public int compareTo(final JButton2 o) {
+			if (o.getText() != null && this.getText() != null) {
+				return this.getText().compareTo(o.getText());
+			}
+			return 0;
+		}
+
+		/**
+		 * @return the parentPanel
+		 */
+		public ControlPanel getParentPanel() {
+			return this.parentPanel;
 		}
 
 	}
+
+	@SuppressWarnings("unused")
+	private class PopulationTable {
+		private final Map<String, Long> combinedKeyMap = new HashMap<>();
+		private java.util.List<CSVRecord> records;
+		private ControlPanel tablePanel;
+
+		/**
+		 * Constructor
+		 *
+		 * @param lookupTable A CSV file listing populations of regions
+		 */
+		public PopulationTable(final File lookupTable) {
+			if (!lookupTable.exists()) {
+				JOptionPane.showInternalMessageDialog(TrackCovid19.this.scrollPane, "File does not exist",
+						lookupTable.getName(), JOptionPane.ERROR_MESSAGE);
+			}
+			if (!lookupTable.canRead()) {
+				JOptionPane.showInternalMessageDialog(TrackCovid19.this.scrollPane,
+						"File exists but is not read-accessible", lookupTable.getName(), JOptionPane.ERROR_MESSAGE);
+			}
+			FileReader reader;
+			try {
+				reader = new FileReader(lookupTable);
+				final var parser = CSVFormat.RFC4180.withFirstRecordAsHeader().parse(reader);
+				this.records = parser.getRecords();
+				parser.close();
+
+				final var rowData = new Vector<Vector<String>>();
+				final var columnNames = new Vector<>(
+						Arrays.asList("Admin2", "Province_State", "Country_Region", "Combined_Key", "Population"));
+
+				for (final CSVRecord record : this.records) {
+					final var popString = record.get("Population");
+					if (popString != null && !popString.isBlank()) {
+						final Long population = Long.parseLong(popString);
+						final var combined_Key = record.get("Combined_Key");
+						this.combinedKeyMap.put(combined_Key, population);
+						final var country_Region = record.get("Country_Region");
+						final var admin2 = record.get("Admin2");
+						final var province_State = record.get("Province_State");
+						final var row = new Vector<>(
+								Arrays.asList(admin2, province_State, country_Region, combined_Key, popString));
+						rowData.add(row);
+					}
+				}
+
+				final var table = new JTable(rowData, columnNames);
+				this.tablePanel = new ControlPanel("populations", null);
+				this.tablePanel.setTitle("Populations");
+				final var scrollPane = new JScrollPane(table);
+				scrollPane.setPreferredSize(new Dimension(300, 400));
+				this.tablePanel.getContentPane().add(scrollPane);
+				this.tablePanel.pack();
+				this.tablePanel.setResizable(true);
+
+				this.tablePanel.setIconifiable(true);
+				this.tablePanel.setClosable(true);
+
+			} catch (final IOException e) {
+				e.printStackTrace();
+			}
+
+		}
+
+		/**
+		 * @param combinedKey The combined key for the region of interest
+		 * @return The population of the regions specified by the combined key.
+		 */
+		public long getPopulationFromCombinedKey(final String combinedKey) {
+			final var population = this.combinedKeyMap.get(combinedKey);
+			return population == null ? 0 : population;
+		}
+
+		/**
+		 * @return the tablePanel The population table displayable in a JDesktop.
+		 */
+		public ControlPanel getTablePanel() {
+			return this.tablePanel;
+		}
+	}// End of PopulationTable class definition.
 
 	private static final String CONFIRMED_GLOBAL_FILE_NAME = "time_series_covid19_confirmed_global.csv";
 
@@ -202,6 +355,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	private Map<String, Set<Long>> countryNames;
 
+	private final Set<ControlPanel> countyWindows = new HashSet<>();
+
 	private final File deathsGlobalFile;
 
 	private Map<String, Integer> deathsGlobalheaderMap;
@@ -235,6 +390,13 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private List<CSVRecord> lookupRecords;
 
 	private final File lookupTable;
+
+	public Set<JButton2> pool = new TreeSet<>();
+
+	/**
+	 * An interface for retrieving population figures from the lookup table file.
+	 */
+	private final PopulationTable populationTable;
 
 	/**
 	 * The currently visible, active province windows
@@ -378,6 +540,45 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			e.printStackTrace();
 		}
 
+		this.populationTable = new PopulationTable(this.lookupTable);
+
+		final var populationTablePanel = this.populationTable.getTablePanel();
+		this.desktop.add(populationTablePanel);
+		populationTablePanel.setVisible(true);
+		populationTablePanel.setPreferredSize(new Dimension(800, 300));
+		populationTablePanel.pack();
+		try {
+			populationTablePanel.setIcon(true);
+		} catch (final PropertyVetoException e1) {
+			e1.printStackTrace();
+		}
+
+	}// End of constructor
+
+	protected void addToPool(final JButton2 jButton2) {
+		System.out.format("Adding to pool %s, %s%n", jButton2.getText(), jButton2.getParentPanel().getName());
+		this.pool.add(jButton2);
+		for (final JButton2 b : this.pool) {
+			System.out.format(" \u2022 %s, %s%n", b.getText(), b.getParentPanel().getName());
+		}
+		this.showPool();
+	}
+
+	@SuppressWarnings("unused")
+	private void analyze() {
+		JOptionPane.showInternalMessageDialog(this.scrollPane, "Analysis not yet implemented.");
+	}
+
+	private void analyzeCountry(final String countryName) {
+		JOptionPane.showInternalMessageDialog(this.scrollPane, "Country analysis not yet implemented.");
+	}
+
+	private void analyzeCounty(final String countyName) {
+		JOptionPane.showInternalMessageDialog(this.scrollPane, "County analysis not yet implemented.");
+	}
+
+	private void analyzeProvince(final String provinceName) {
+		JOptionPane.showInternalMessageDialog(this.scrollPane, "Province analysis not yet implemented.");
 	}
 
 	private void arrangeWindows() {
@@ -410,104 +611,168 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	/**
-	 * Action when a country button is pushed
+	 * Action when a button is pushed. Receives the button&rsquo;s text prefixed
+	 * with that button&rsquo;s <code>charOn</code> or <code>charOff</code>
+	 * character depending on whether the action turned the button on or off.
 	 *
 	 * @param text
 	 */
-	private void countryButtonPushed(final String text) {
-		final var buttonText = text.substring(1);
+	private void button2Action(final String text, final JButton2 jButton2) {
 
 		// The first character of text is a code indicating the type of button and
 		// action
 
 		final var firstChar = text.charAt(0);
+		final var buttonText = text.substring(1);
 
 		switch (firstChar) {
 		case '+':// selected country button
-			final var recordIndices = this.countryNames.get(buttonText);
-			if (recordIndices == null) {
-				return;
-			}
-			System.out.format("selected country %s%n", buttonText);
-
-			if (recordIndices.size() > 1) {// If there is more than one province
-				final var showProvinces = this.showProvinces(recordIndices, this.confirmedGlobalRecords);
-				showProvinces.setName(buttonText);
-				this.provinceWindows.add(showProvinces);
-			} else if (buttonText.equalsIgnoreCase("US")) {
-				final var showStates = this.showStates(this.confirmedUSRecords, buttonText);
-				showStates.setName(buttonText);
-				this.provinceWindows.add(showStates);
-			}
+			this.buttonCountrySelected(buttonText, jButton2);
 			break;
 		case '-':// deselected country button
-			System.out.format("de-selected country %s%n", buttonText);
-			final Set<ControlPanel> delenda = new HashSet<>();
-			for (final ControlPanel w : this.provinceWindows) {
-				if (w.getName().equalsIgnoreCase(buttonText)) {
-					delenda.add(w);
-				}
-			}
-			for (final ControlPanel d : delenda) {
-				this.provinceWindows.remove(d);
-				d.dispose();
-			}
+			this.buttonCountryDeselected(buttonText, jButton2);
 			break;
 		case '0':// selected state button
-			System.out.format("selected state %s%n", buttonText);
+			this.buttonStateSelected(buttonText, jButton2);
 			break;
 		case '1':// de-selected state button
-			System.out.format("de-selected state %s%n", buttonText);
+			this.buttonStateDeselected(buttonText, jButton2);
 			break;
 		case '2':// selected county button
-			System.out.format("selected county %s%n", buttonText);
+			this.buttonCountySelected(buttonText, jButton2);
 			break;
 		case '3':// de-selected county button
-			System.out.format("de-selected county %s%n", buttonText);
+			this.buttonCountyDeselecte(buttonText, jButton2);
 			break;
 		case '4':// selected province button
-			System.out.format("selected province %s%n", buttonText);
+			this.buttonProvinceSelected(buttonText, jButton2);
 			break;
 		case '5':// de-selected province button
-			System.out.format("de-selected province %s%n", buttonText);
+			this.buttonProvinceDeselected(buttonText, jButton2);
 			break;
 		default:
 			throw new RuntimeException("unimplemented case:  '" + firstChar + "' " + buttonText);
 		}
 
-//		if (text.startsWith("+")) {// If country button is now selected
-//			final var recordIndices = this.countryNames.get(buttonText);
-//			if (recordIndices == null) {
-//				return;
-//			}
-//			if (recordIndices.size() > 1) {// If there is more than one province
-//				final var showProvinces = this.showProvinces(recordIndices, this.confirmedGlobalRecords);
-//				showProvinces.setName(buttonText);
-//				this.provinceWindows.add(showProvinces);
-//			} else if (buttonText.equalsIgnoreCase("US")) {
-//				final var showStates = this.showStates(this.confirmedUSRecords, buttonText);
-//				showStates.setName(buttonText);
-//				this.provinceWindows.add(showStates);
-//			}
-//
-//		} else
-//
-//		{// if country button is deselected
-//
-//			/*
-//			 * If country button is de-selected, remove the provinces window.
-//			 */
-//			final Set<ControlPanel> delenda = new HashSet<>();
-//			for (final ControlPanel w : this.provinceWindows) {
-//				if (w.getName().equalsIgnoreCase(buttonText)) {
-//					delenda.add(w);
-//				}
-//			}
-//			for (final ControlPanel d : delenda) {
-//				this.provinceWindows.remove(d);
-//				d.dispose();
-//			}
-//		}
+	}
+
+	/**
+	 * @param countryName
+	 * @param jButton2
+	 */
+	private void buttonCountryDeselected(final String countryName, final JButton2 jButton2) {
+		System.out.format("de-selected country %s%n", countryName);
+
+		if (countryName.equalsIgnoreCase("US")) {// de-select all selected states
+			final Set<ControlPanel> delenda = new HashSet<>();
+			for (final ControlPanel window : this.countyWindows) {
+				delenda.add(window);
+			}
+			for (final ControlPanel d : delenda) {
+				this.countyWindows.remove(d);
+				System.out.format("de-selected state %s%n", d.getName());
+				d.dispose();
+			}
+
+		}
+
+		final Set<ControlPanel> delenda = new HashSet<>();
+		for (final ControlPanel window : this.provinceWindows) {
+			if (window.getName().equalsIgnoreCase(countryName)) {
+				delenda.add(window);
+			}
+		}
+		for (final ControlPanel d : delenda) {
+			this.provinceWindows.remove(d);
+			d.dispose();
+		}
+	}
+
+	/**
+	 * @param countryName
+	 * @param jButton2
+	 */
+	private void buttonCountrySelected(final String countryName, final JButton2 jButton2) {
+		final var recordIndices = this.countryNames.get(countryName);
+		System.out.format("selected country %s%n", countryName);
+
+		if (recordIndices.size() > 1) {// If there is more than one province
+			final var showProvinces = this.showProvinces(recordIndices, this.confirmedGlobalRecords, jButton2);
+			showProvinces.setName(countryName);
+			this.provinceWindows.add(showProvinces);
+		} else if (countryName.equalsIgnoreCase("US")) {
+			final var showStates = this.showStates(this.confirmedUSRecords, countryName, jButton2);
+			showStates.setName(countryName);
+			this.provinceWindows.add(showStates);
+		} else {
+			this.analyzeCountry(countryName);
+		}
+	}
+
+	/**
+	 * @param buttonText Name of county
+	 * @param jButton2
+	 */
+	private void buttonCountyDeselecte(final String buttonText, final JButton2 jButton2) {
+		System.out.format("de-selected county %s, %s%n", buttonText, jButton2.getParentPanel().getName());
+	}
+
+	/**
+	 * @param countyName Name of county
+	 * @param jButton2
+	 */
+	private void buttonCountySelected(final String countyName, final JButton2 jButton2) {
+		System.out.format("selected county %s, %s%n", countyName, jButton2.getParentPanel().getName());
+		this.analyzeCounty(countyName);
+	}
+
+	/**
+	 * @param buttonText name of province
+	 */
+	private void buttonProvinceDeselected(final String buttonText, final JButton2 jButton2) {
+		System.out.format("de-selected province %s, %s%n", buttonText, jButton2.getParentPanel().getName());
+	}
+
+	/**
+	 * @param provinceName name of province
+	 * @param jButton2
+	 */
+	private void buttonProvinceSelected(final String provinceName, final JButton2 jButton2) {
+		System.out.format("selected province %s, %s%n", provinceName, jButton2.getParentPanel().getName());
+		this.analyzeProvince(provinceName);
+	}
+
+	/**
+	 * @param buttonText name of state
+	 * @param jButton2
+	 */
+	private void buttonStateDeselected(final String buttonText, final JButton2 jButton2) {
+		System.out.format("de-selected state %s, %s%n", buttonText, jButton2.getParentPanel().getName());
+		final Set<ControlPanel> delenda = new HashSet<>();
+		for (final ControlPanel window : this.countyWindows) {
+			if (window.getName().equalsIgnoreCase(buttonText)) {
+				delenda.add(window);
+			}
+		}
+		for (final ControlPanel d : delenda) {
+			this.countyWindows.remove(d);
+			d.dispose();
+		}
+	}
+
+	/**
+	 * @param stateName name of state
+	 * @param jButton2  The state button
+	 */
+	private void buttonStateSelected(final String stateName, final JButton2 jButton2) {
+		System.out.format("selected state %s, %s%n", stateName, jButton2.getParentPanel().getName());
+
+		final var recordIndices = this.stateNames.get(stateName);
+
+		final var countiesWindow = this.showCounties(recordIndices, this.confirmedUSRecords, jButton2);
+		countiesWindow.setName(stateName);
+
+		this.countyWindows.add(countiesWindow);
 
 	}
 
@@ -598,6 +863,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			value.add(rowIndex);
 			result.put(stateName, value);
 		}
+
 		return result;
 	}
 
@@ -620,14 +886,23 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		}
 	}
 
+	public Object removeFromPool(final JButton2 jButton2) {
+		System.out.format("Removing from pool %s, %s%n", jButton2.getText(), jButton2.getParentPanel().getName());
+		this.pool.remove(jButton2);
+		for (final JButton2 b : this.pool) {
+			System.out.format(" \u2022 %s, %s%n", b.getText(), b.getParentPanel().getName());
+		}
+
+		return null;
+	}
+
 	@Override
 	public void run() {
 
-		final var countryButtons = new ControlPanel("Select Country");
+		final var countryButtons = new ControlPanel("Countries", null);
 		this.desktop.add(countryButtons);
 		countryButtons.setPreferredSize(new Dimension(860, 800));
 		countryButtons.setResizable(false);
-		countryButtons.setTitle("Countries");
 		final var countryButtonsPanel = new JPanel();
 		countryButtonsPanel.setLayout(new FlowLayout());
 		final var label = new JLabel("Countries");
@@ -664,7 +939,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 		this.countryNames = this.getCountryNames(this.confirmedGlobalheaderMap, this.confirmedGlobalRecords);
 		for (final String country : this.countryNames.keySet()) {
-			countryButtonsPanel.add(new JButton2(country, '+', '-'));
+			countryButtonsPanel.add(new JButton2(country, '+', '-', countryButtons, ADMIN.country));
 		}
 
 		this.stateNames = this.getStateNames(this.confirmedUSheaderMap, this.confirmedUSRecords);
@@ -695,14 +970,61 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		});
 	}
 
+	private ControlPanel showCounties(final List<Long> recordIndices, final List<CSVRecord> records,
+			final JButton2 parent) {
+		final var countyButtons = new ControlPanel("Select County", parent);
+		this.desktop.add(countyButtons);
+		countyButtons.setPreferredSize(new Dimension(460, 600));
+		countyButtons.setResizable(false);
+		final var iterator = recordIndices.iterator();
+		if (!iterator.hasNext()) {
+			throw new RuntimeException("Internal error:  recordIndices is empty");
+		}
+
+		final Long index = iterator.next() - 1;
+		final var csvRecord = records.get(index.intValue());
+		final var countryName = csvRecord.get("Province_State");
+		final var title = "Counties of " + parent.getText();
+		countyButtons.setTitle(title);
+		final var countyButtonsPanel = new JPanel();
+		countyButtonsPanel.setLayout(new FlowLayout());
+		final var label = new JLabel(title);
+		label.setPreferredSize(new Dimension(450, 55));
+		label.setFont(label.getFont().deriveFont(30f));
+		label.setHorizontalAlignment(SwingConstants.CENTER);
+		countyButtonsPanel.add(label);
+		final var provinceName = csvRecord.get("Admin2");
+		final var name1a = provinceName.isEmpty() ? countryName : provinceName;
+		countyButtonsPanel.add(new JButton2(name1a, '2', '3', countyButtons, ADMIN.county));
+		countyButtons.setContentPane(countyButtonsPanel);
+		while (iterator.hasNext()) {
+			final var recordIndex1 = iterator.next().intValue() - 1;
+			final var csvRecord2 = records.get(recordIndex1);
+			final var name1 = csvRecord2.get("Admin2");
+			final var name1b = name1.isEmpty() ? countryName : name1;
+			countyButtonsPanel.add(new JButton2(name1b, '2', '3', countyButtons, ADMIN.county));
+		}
+		countyButtons.pack();
+		countyButtons.setVisible(true);
+		this.arrangeWindows();
+		return countyButtons;
+	}
+
 	/**
 	 * Invoked when a country has more than one province.
 	 *
-	 * @param recordIndices indices of all records for the selected country.
-	 * @return
 	 */
-	private ControlPanel showProvinces(final Set<Long> recordIndices, final List<CSVRecord> records) {
-		final var provinceButtons = new ControlPanel("Select Province");
+	/**
+	 * @param recordIndices Set of row indices for which buttons are to be shown in
+	 *                      the new panel.
+	 * @param records       csv table rows
+	 * @param parent        the button which was activated to create this
+	 *                      ControlPanel
+	 * @return the new ControlPanel
+	 */
+	private ControlPanel showProvinces(final Set<Long> recordIndices, final List<CSVRecord> records,
+			final JButton2 parent) {
+		final var provinceButtons = new ControlPanel("Select Province", parent);
 		this.desktop.add(provinceButtons);
 		provinceButtons.setPreferredSize(new Dimension(460, 600));
 		provinceButtons.setResizable(false);
@@ -724,14 +1046,14 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		provinceButtonsPanel.add(label);
 		final var provinceName = csvRecord.get("Province/State");
 		final var name1a = provinceName.isEmpty() ? countryName : provinceName;
-		provinceButtonsPanel.add(new JButton2(name1a, '4', '5'));
+		provinceButtonsPanel.add(new JButton2(name1a, '4', '5', provinceButtons, ADMIN.province));
 		provinceButtons.setContentPane(provinceButtonsPanel);
 		while (iterator.hasNext()) {
 			final var recordIndex1 = iterator.next().intValue() - 1;
 			final var csvRecord2 = records.get(recordIndex1);
 			final var name1 = csvRecord2.get("Province/State");
 			final var name1b = name1.isEmpty() ? countryName : name1;
-			provinceButtonsPanel.add(new JButton2(name1b, '4', '5'));
+			provinceButtonsPanel.add(new JButton2(name1b, '4', '5', provinceButtons, ADMIN.province));
 		}
 		provinceButtons.pack();
 		provinceButtons.setVisible(true);
@@ -744,11 +1066,11 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param countryName
 	 * @return
 	 */
-	private ControlPanel showStates(final List<CSVRecord> records, final String countryName) {
+	private ControlPanel showStates(final List<CSVRecord> records, final String countryName, final JButton2 jButton2) {
 		if (!"US".contentEquals(countryName)) {
 			throw new RuntimeException("Internal error:  country name is not \"US\"");
 		}
-		final var stateButtons = new ControlPanel("Select State");
+		final var stateButtons = new ControlPanel("Select State", jButton2);
 		this.desktop.add(stateButtons);
 		stateButtons.setPreferredSize(new Dimension(460, 600));
 		stateButtons.setResizable(false);
@@ -771,7 +1093,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		while (iterator.hasNext()) {
 			final var stateName = iterator.next();
 			final var name1a = stateName.isEmpty() ? countryName : stateName;
-			stateButtonsPanel.add(new JButton2(name1a, '0', '1'));
+			stateButtonsPanel.add(new JButton2(name1a, '0', '1', stateButtons, ADMIN.state));
 		}
 
 		stateButtons.pack();
@@ -788,10 +1110,10 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		final var optionType = JOptionPane.YES_NO_OPTION;
 		final var title = "Confirm";
 		final var message = "Exit?";
+		Toolkit.getDefaultToolkit().beep();
 		final var answer = JOptionPane.showInternalConfirmDialog(this.scrollPane, message, title, optionType);
 		if (answer == JOptionPane.YES_OPTION) {
 			this.dispose();
 		}
 	}
-
 }
