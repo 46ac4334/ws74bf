@@ -28,6 +28,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.Vector;
 
+import javax.swing.BorderFactory;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
@@ -41,6 +42,7 @@ import javax.swing.JTable;
 import javax.swing.JToggleButton;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
+import javax.swing.border.BevelBorder;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
@@ -129,12 +131,12 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			final var g = this.createGraphics();
 			g.setColor(Color.GREEN);
 			g.fillRect(0, 0, width, height);
-			final var size = 160;
+			final var size = 140;
 			g.setFont(new Font("Times new Roman", Font.BOLD, size));
-			g.setColor(Color.WHITE);
+			g.setColor(Color.BLACK);
 			final var x = 6;
-			final var y = 120;
-			g.drawString("V", x, y);
+			final var y = 110;
+			g.drawString("C", x, y);
 		}
 	}
 
@@ -188,6 +190,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			final var menuItem2 = new JMenuItem("Remove from pool");
 			menuItem2.addActionListener(e -> TrackCovid19.this.removeFromPool(JButton2.this));
 			this.popup.add(menuItem2);
+			final var menuItem3 = new JMenuItem("Analyze now");
+			menuItem3.addActionListener(e -> TrackCovid19.this.analyzeNow(JButton2.this));
+			this.popup.add(menuItem3);
 
 		}
 
@@ -393,6 +398,12 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	public Set<JButton2> pool = new TreeSet<>();
 
+	private package18.TrackCovid19.ControlPanel poolFrame;
+
+	private final List<JLabel> poolLabels = new ArrayList<>();
+
+	private final JPanel poolPanel = new JPanel();
+
 	/**
 	 * An interface for retrieving population figures from the lookup table file.
 	 */
@@ -566,19 +577,64 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	@SuppressWarnings("unused")
 	private void analyze() {
+		Toolkit.getDefaultToolkit().beep();
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Analysis not yet implemented.");
 	}
 
-	private void analyzeCountry(final String countryName) {
+	private void analyzeCountry(final JButton2 button) {//TODO
+		System.out.format("analyzing %s%n", button.getText());
+		final var plotter = new Plotter6165i();
+		this.desktop.add(plotter);
+		final var path = new java.awt.geom.Path2D.Double();
+		path.moveTo(0, 0);
+		path.lineTo(1, 1);
+		plotter.setMainPlotPath(path);
+		plotter.setPlotTitle(button.getText());
+		plotter.pack();
+		plotter.setVisible(true);
+		Toolkit.getDefaultToolkit().beep();
+		this.arrangeWindows();
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Country analysis not yet implemented.");
 	}
 
-	private void analyzeCounty(final String countyName) {
+	private void analyzeCounty(final JButton2 button) {
+		Toolkit.getDefaultToolkit().beep();
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "County analysis not yet implemented.");
 	}
 
-	private void analyzeProvince(final String provinceName) {
+	public Object analyzeNow(final JButton2 button) {
+		// TODO Auto-generated method stub
+		Toolkit.getDefaultToolkit().beep();
+
+		System.out.format("%s%n", button.admin);
+
+		switch (button.admin) {
+		case country:
+			this.analyzeCountry(button);
+			break;
+		case county:
+			this.analyzeCounty(button);
+			break;
+		case province:
+			this.analyzeProvince(button);
+			break;
+		case state:
+			this.analyzeState(button);
+			break;
+		default:
+			throw new RuntimeException("Unimplemented case: " + button.admin);
+		}
+
+		return null;
+	}
+
+	private void analyzeProvince(final JButton2 button) {
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Province analysis not yet implemented.");
+	}
+
+	private void analyzeState(final JButton2 button) {
+		// TODO Auto-generated method stub
+
 	}
 
 	private void arrangeWindows() {
@@ -705,7 +761,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			showStates.setName(countryName);
 			this.provinceWindows.add(showStates);
 		} else {
-			this.analyzeCountry(countryName);
+			this.analyzeCountry(jButton2);
 		}
 	}
 
@@ -723,7 +779,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 */
 	private void buttonCountySelected(final String countyName, final JButton2 jButton2) {
 		System.out.format("selected county %s, %s%n", countyName, jButton2.getParentPanel().getName());
-		this.analyzeCounty(countyName);
+		this.analyzeCounty(jButton2);
 	}
 
 	/**
@@ -739,7 +795,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 */
 	private void buttonProvinceSelected(final String provinceName, final JButton2 jButton2) {
 		System.out.format("selected province %s, %s%n", provinceName, jButton2.getParentPanel().getName());
-		this.analyzeProvince(provinceName);
+		this.analyzeProvince(jButton2);
 	}
 
 	/**
@@ -892,7 +948,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		for (final JButton2 b : this.pool) {
 			System.out.format(" \u2022 %s, %s%n", b.getText(), b.getParentPanel().getName());
 		}
-
+		this.showPool();
 		return null;
 	}
 
@@ -1008,6 +1064,52 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		countyButtons.setVisible(true);
 		this.arrangeWindows();
 		return countyButtons;
+	}
+
+	private ControlPanel showPool() {
+		if (this.poolFrame == null) {
+			this.poolFrame = new ControlPanel("Pool", null);
+			this.desktop.add(this.poolFrame);
+			this.poolFrame.setPreferredSize(new Dimension(460, 600));
+			this.poolFrame.setResizable(false);
+			final var title = "pool";
+			this.poolFrame.setTitle(title);
+			this.poolPanel.setLayout(new FlowLayout());
+			final var label = new JLabel(title);
+			label.setPreferredSize(new Dimension(450, 55));
+			label.setFont(label.getFont().deriveFont(30f));
+			label.setHorizontalAlignment(SwingConstants.CENTER);
+			this.poolPanel.add(label);
+			this.poolFrame.setContentPane(this.poolPanel);
+			this.poolFrame.pack();
+			this.poolFrame.setVisible(true);
+			this.arrangeWindows();
+		}
+		for (final JLabel l : this.poolLabels) {
+			this.poolPanel.remove(l);
+		}
+		this.poolLabels.clear();
+
+		final var border = BorderFactory.createBevelBorder(BevelBorder.RAISED);
+		for (final JButton2 p : this.pool) {
+			final var e = new JLabel(p.getText());
+			e.setBorder(border);
+			this.poolLabels.add(e);
+			System.out.println("added " + p.getText() + " to poolLabels.");
+		}
+		for (final JLabel l : this.poolLabels) {
+			this.poolPanel.add(l);
+		}
+		this.poolPanel.setLayout(new FlowLayout());
+		final var layout = this.poolPanel.getLayout();
+		if (layout instanceof FlowLayout) {
+			this.repaint();
+		}
+		layout.layoutContainer(this.poolPanel);
+		this.poolPanel.setLayout(null);
+		this.poolFrame.repaint();
+		return this.poolFrame;
+
 	}
 
 	/**
