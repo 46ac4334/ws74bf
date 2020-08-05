@@ -16,6 +16,8 @@ import java.beans.PropertyVetoException;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -76,6 +78,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 */
 		public ControlPanel(final String string, final JButton2 parent) {
 			super(string);
+			this.setIconifiable(true);
 			this.init();
 		}
 
@@ -304,6 +307,11 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private static final String DATA_DIR_NAME = "csse_covid_19_data";
 
 	/**
+	 * Parser for column names which represent dates
+	 */
+	private static final DateFormat dateInstance = DateFormat.getDateInstance(DateFormat.SHORT);
+
+	/**
 	 * Pattern for column names which represent dates: one or two digits followed by
 	 * a slash, another one or two digits, a slash, and a final sequence of one or
 	 * two digits.
@@ -346,6 +354,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		EventQueue.invokeLater(app);
 	}
 
+	private boolean buildStateHeaderList = true;
+
 	private final File confirmedGlobalFile;
 
 	private Map<String, Integer> confirmedGlobalheaderMap;
@@ -361,6 +371,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private Map<String, Set<Long>> countryNames;
 
 	private final Set<ControlPanel> countyWindows = new HashSet<>();
+
+	private final List<String> dateHeaderList = new ArrayList<>();
 
 	private final File deathsGlobalFile;
 
@@ -581,20 +593,31 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Analysis not yet implemented.");
 	}
 
-	private void analyzeCountry(final JButton2 button) {//TODO
-		System.out.format("analyzing %s%n", button.getText());
+	private void analyzeCountry(final JButton2 button) {// TODO
+		final var countryName = button.getText();
+		final var cumulativeCounts = this.getCountsForCountry(countryName);
+		if (cumulativeCounts == null) {
+			System.out.format("counts are null for country %s%n", countryName);
+		}
+		final var cumulCountsIterator = cumulativeCounts.iterator();
+		System.out.format("analyzing %s%n", countryName);
 		final var plotter = new Plotter6165i();
+		plotter.setPreferredSize(new Dimension(460, 368));
 		this.desktop.add(plotter);
 		final var path = new java.awt.geom.Path2D.Double();
 		path.moveTo(0, 0);
-		path.lineTo(1, 1);
+		var i = 0;
+		while (cumulCountsIterator.hasNext()) {
+			final var next = cumulCountsIterator.next();
+			path.lineTo(i, next);
+			++i;
+		}
 		plotter.setMainPlotPath(path);
-		plotter.setPlotTitle(button.getText());
+		plotter.setPlotTitle(countryName);
 		plotter.pack();
 		plotter.setVisible(true);
-		Toolkit.getDefaultToolkit().beep();
 		this.arrangeWindows();
-		JOptionPane.showInternalMessageDialog(this.scrollPane, "Country analysis not yet implemented.");
+		return;
 	}
 
 	private void analyzeCounty(final JButton2 button) {
@@ -603,8 +626,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	public Object analyzeNow(final JButton2 button) {
-		// TODO Auto-generated method stub
-		Toolkit.getDefaultToolkit().beep();
 
 		System.out.format("%s%n", button.admin);
 
@@ -633,7 +654,34 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	private void analyzeState(final JButton2 button) {
-		// TODO Auto-generated method stub
+		final var stateName = button.getText();
+		final var cumulativeCounts = this.getCountsForState(stateName);
+		if (cumulativeCounts == null) {
+			System.out.format("counts are null for state %s%n", stateName);
+		}
+		if (cumulativeCounts.isEmpty()) {
+			System.out.format("counts are empty for state %s%n", stateName);
+		}
+		final var cumulCountsIterator = cumulativeCounts.iterator();
+		System.out.format("analyzing %s%n", stateName);
+		final var plotter = new Plotter6165i();
+		plotter.setPreferredSize(new Dimension(460, 368));
+		this.desktop.add(plotter);
+		final var path = new java.awt.geom.Path2D.Double();
+		path.moveTo(0, 0);
+//		path.lineTo(1, 1);
+		var i = 0;
+		while (cumulCountsIterator.hasNext()) {
+			final var next = cumulCountsIterator.next();
+			path.lineTo(i, next);
+			++i;
+		}
+		plotter.setMainPlotPath(path);
+		plotter.setPlotTitle(stateName);
+		plotter.pack();
+		plotter.setVisible(true);
+		this.arrangeWindows();
+		return;
 
 	}
 
@@ -853,6 +901,66 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		return result;
 	}
 
+	private List<Integer> getCountsForCountry(final String countryName) {
+		System.out.format("getting counts for %s%n", countryName);
+
+		final var integer = this.confirmedGlobalheaderMap.get("Country/Region");
+		final List<Integer> result = new ArrayList<>();
+
+		for (final CSVRecord r : this.confirmedGlobalRecords) {
+			final var string = r.get(integer);
+			if (string.equalsIgnoreCase(countryName)) {
+
+				for (final String i : this.dateHeaderList) {
+					final var count = r.get(i);
+					result.add(Integer.parseInt(count));
+				}
+				break;
+			} else {
+			}
+		}
+		return result;
+	}
+
+	private List<Integer> getCountsForState(final String stateName) {
+		System.out.format("getting counts for %s%n", stateName);
+
+		final var columnIndex = this.confirmedUSheaderMap.get("Province_State");
+		System.out.format("columnIndex = %,d%n", columnIndex);
+		final List<Integer> dailyCounts = new ArrayList<>();
+
+		final Map<Date, Integer> dateCountMap = new TreeMap<>();
+
+		for (final CSVRecord record : this.confirmedUSRecords) {
+			// search through all US records. Pick the ones for the requested state
+			final var string = record.get(columnIndex);
+			if (string.equalsIgnoreCase(stateName)) {// If this record is for a county in the requested state:
+				// sum over all counties.
+				for (final String dateHeader : this.dateHeaderList) {// iterate through all date column headers
+					final var dailyCountForCounty = Integer.parseInt(record.get(dateHeader));
+					try {
+						final var date = TrackCovid19.dateInstance.parse(dateHeader);
+						final Integer sum = dateCountMap.containsKey(date) ? dateCountMap.get(date) : 0;
+						final var newSum = sum + dailyCountForCounty;
+						System.out.format("%s %,d + %,d = %,d%n", date, sum, dailyCountForCounty, newSum);
+						dateCountMap.put(date, newSum);
+					} catch (final ParseException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+
+		// Copy sums from dateCountMap to dailyCounts
+		for (final Date key : dateCountMap.keySet()) {// TODO keys are not in date sort order!
+			final var count = dateCountMap.get(key);
+			System.out.format("%s %,d%n", key, count);
+			dailyCounts.add(count);
+		}
+
+		return dailyCounts;
+	}
+
 	/**
 	 * @return The directory containing the csse_covid_19_time_series files in the
 	 *         local replica of the JHU csse_covid_19_data database.
@@ -930,16 +1038,28 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private void printHeaderMap(final Map<String, Integer> headerMap) {
 		System.out.format("%5s %s%n", "value", "key");
 		System.out.format("%5s %s%n", "\u2500\u2500\u2500\u2500\u2500", "\u2500\u2500\u2500");
+		var firstDate = true;
 		for (final String key : headerMap.keySet()) {
 			if (!key.matches(TrackCovid19.datePattern)) {
 				System.out.format("%,5d %s%n", headerMap.get(key), key);
 			} else {
-				System.out.format("%5s %s%n", "\u2022", " ");
-				System.out.format("%5s %s%n", "\u2022", "Dates");
-				System.out.format("%5s %s%n", "\u2022", " ");
-				break;
+				if (firstDate) {
+					System.out.format("%5s %s%n", "\u2022", " ");
+					System.out.format("%5s %s%n", "\u2022", "Dates");
+					System.out.format("%5s %s%n", "\u2022", " ");
+					firstDate = false;
+				}
+				try {
+					if (this.buildStateHeaderList) {
+						this.dateHeaderList.add(key);
+					}
+					final var date = TrackCovid19.dateInstance.parse(key);
+				} catch (final ParseException e) {
+					e.printStackTrace();
+				}
 			}
 		}
+		this.buildStateHeaderList = false;
 	}
 
 	public Object removeFromPool(final JButton2 jButton2) {
