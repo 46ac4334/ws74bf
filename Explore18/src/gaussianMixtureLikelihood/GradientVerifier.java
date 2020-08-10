@@ -9,7 +9,7 @@ import javax.swing.JOptionPane;
 
 /**
  * Invokes {@link GaussianMixtureLogLikelihood} with random arguments to test
- * the accuracy of the derivative from that module.
+ * the accuracy of the derivative calculated by that module.
  *
  * @author bakis
  *

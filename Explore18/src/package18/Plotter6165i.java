@@ -197,7 +197,10 @@ public class Plotter6165i extends JInternalFrame {
 
 		private Insets insets;
 
-		public final Color majorGridColor = Color.getHSBColor(.5f, .5f, .75f);
+		public Path2D.Double logPath;
+
+//		public final Color majorGridColor = Color.getHSBColor(.5f, .5f, .75f);
+		public final Color majorGridColor = Color.getHSBColor(.5f, .25f, .9f);
 
 		private Color[] markerColors = new Color[] { Color.getHSBColor(0f, 1f, .85f), Color.getHSBColor(.33f, 1f, .85f),
 				Color.getHSBColor(.67f, 1f, .85f) };
@@ -208,9 +211,9 @@ public class Plotter6165i extends JInternalFrame {
 
 		private final List<Shape> markers = new ArrayList<>();
 
-		private int mouseDownButton;
-
 		// private AffineTransform pathToUnitBoxTransform;
+
+		private int mouseDownButton;
 
 		private Point mouseDownPoint;
 
@@ -260,6 +263,8 @@ public class Plotter6165i extends JInternalFrame {
 
 		private final BasicStroke selectedStroke = new BasicStroke(2);
 
+		public List<Shape> semilogPaths = new ArrayList<>();
+
 		boolean showMainPlotPath = true;
 
 		private final Stroke stroke2 = new BasicStroke(1.4f);
@@ -274,7 +279,7 @@ public class Plotter6165i extends JInternalFrame {
 
 		private final JPopupMenu textAreaPopup = new JPopupMenu();
 
-//		public List<JToggleButton> toggleButtons = new ArrayList<>();
+		// public List<JToggleButton> toggleButtons = new ArrayList<>();
 		public List<JToggleButton> toggleButtons = new ArrayList<>();
 
 		private AffineTransform transform;
@@ -696,7 +701,7 @@ public class Plotter6165i extends JInternalFrame {
 				super.paint(g);
 
 				/*
-				 * Width and height of plot window in pixels.
+				 * Width and height of the available plotting area in pixels.
 				 */
 				final var w = width - this.insets.left - this.insets.right;
 				final var h = height - this.insets.top - this.insets.bottom;
@@ -797,59 +802,68 @@ public class Plotter6165i extends JInternalFrame {
 
 					g.draw(transformedYGrid3);
 
-					g.setColor(g.getColor().darker());
+//					g.setColor(g.getColor().darker());
 					g.setStroke(this.stroke2);
 					g.draw(transformedXGrid2);
 					g.draw(transformedYGrid2);
 
-					final var transformedShape = this.plotTransform.createTransformedShape(this.path);
-					g.setStroke(this.plotStroke);
-					g.setColor(this.plotColor);
-					if (transformedShape != null) {
+					final Shape pSrc = Plotter6165i.this.semiLog ? (Shape) this.logPath : this.path;
+					final var transformedShape = this.plotTransform.createTransformedShape(pSrc);
+					/*
+					 * If toggleButton 0 is selected, then plot either the main path or its
+					 * logarithm, depending on the value of Plotter6165i.this.semiLog
+					 */
+					final var selected = this.toggleButtons.get(0).isSelected();
+					if (selected) {
+						g.setStroke(this.plotStroke);
+						g.setColor(this.plotColor);
+						if (transformedShape != null) {
 
-						if (this.showMainPlotPath) {
-							g.draw(transformedShape);
-						}
+							if (this.showMainPlotPath) {
+								g.draw(transformedShape);
+							}
 
-						if (this.drawMarkers) {
-							final var pathIterator = transformedShape.getPathIterator(null);
-							final var coords = new double[2];
-							var i = 0;
-							final var n = this.markerColors.length;
-							this.markers.clear();
-							while (!pathIterator.isDone()) {
-								pathIterator.currentSegment(coords);
-								final var j = i++ % n;
-								g.setColor(this.markerColors[j]);
-								final var r = this.markerRadius /*- (0.7f * j)*/;
-								final Shape marker = new Ellipse2D.Double(coords[0] - r, coords[1] - r, 2 * r, 2 * r);
-								this.markers.add(marker);
-								g.fill(marker);
-								if (this.markerLineColors != null && this.markerLineColors[j] != null) {
-									g.setColor(this.markerLineColors[j]);
+							if (this.drawMarkers) {
+								final var pathIterator = transformedShape.getPathIterator(null);
+								final var coords = new double[2];
+								var i = 0;
+								final var n = this.markerColors.length;
+								this.markers.clear();
+								while (!pathIterator.isDone()) {
+									pathIterator.currentSegment(coords);
+									final var j = i++ % n;
+									g.setColor(this.markerColors[j]);
+									final var r = this.markerRadius /*- (0.7f * j)*/;
+									final Shape marker = new Ellipse2D.Double(coords[0] - r, coords[1] - r, 2 * r,
+											2 * r);
+									this.markers.add(marker);
+									g.fill(marker);
+									if (this.markerLineColors != null && this.markerLineColors[j] != null) {
+										g.setColor(this.markerLineColors[j]);
+									}
+									g.draw(marker);
+									pathIterator.next();
 								}
-								g.draw(marker);
-								pathIterator.next();
-							}
-							if (this.selectedMarker != null) {
-								final var j = this.selectedMarkerIndex % n;
-								g.setColor(this.markerColors[j]);
-								g.fill(this.selectedMarker);
-								g.draw(this.selectedMarker);
+								if (this.selectedMarker != null) {
+									final var j = this.selectedMarkerIndex % n;
+									g.setColor(this.markerColors[j]);
+									g.fill(this.selectedMarker);
+									g.draw(this.selectedMarker);
+								}
 							}
 						}
-					}
 
+					}
 				}
 
 				g.setClip(this.boundingBox);
 				for (var i = 0; i < this.paths.size(); ++i) {
-					final var pSrc = this.paths.get(i);
+					final var pSrc = Plotter6165i.this.semiLog ? this.semilogPaths.get(i) : this.paths.get(i);
 					if (pSrc == null || this.plotTransform == null) {
 						continue;
 					}
 
-					final var selected = this.toggleButtons.get(i).isSelected();
+					final var selected = this.toggleButtons.get(i + 1).isSelected();
 
 					if (this.visibilities.get(i) && selected) {
 						final var transformedShape = this.plotTransform.createTransformedShape(pSrc);
@@ -1242,11 +1256,14 @@ public class Plotter6165i extends JInternalFrame {
 
 	}
 
-	private static final DateFormat dateInstance = DateFormat.getDateInstance(DateFormat.SHORT);
+	private static final DateFormat DATE_INSTANCE = DateFormat.getDateInstance(DateFormat.SHORT);
+
+	private static final LinearToSemilogPathConverter lINEAR_TO_SEMILOG_PATH_CONVERTER = new LinearToSemilogPathConverter(
+			0.5);
 
 	public static final long MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
 
-	private static final MetalToggleButtonUI newUI = new MetalToggleButtonUI() {
+	private static final MetalToggleButtonUI NEW_UI = new MetalToggleButtonUI() {
 
 		@Override
 		protected void paintButtonPressed(final Graphics g, final AbstractButton b) {
@@ -1297,7 +1314,7 @@ public class Plotter6165i extends JInternalFrame {
 	 * @return the dateinstance
 	 */
 	public static DateFormat getDateinstance() {
-		return Plotter6165i.dateInstance;
+		return Plotter6165i.DATE_INSTANCE;
 	}
 
 	/**
@@ -1537,12 +1554,18 @@ public class Plotter6165i extends JInternalFrame {
 			final var newButton = new JToggleButton(String.format("%d", this.controlPanel.counter), true);
 			newButton.setFont(this.contorlPanelFont1);
 			newButton.addActionListener(e -> Plotter6165i.this.plotterPane.repaint());
-			newButton.setUI(Plotter6165i.newUI);
+			newButton.setUI(Plotter6165i.NEW_UI);
 			newButton.setBorderPainted(true);
+			final var toggleButtonPopup = new JPopupMenu();
+			final var zoomItem = new JMenuItem("zoom to fullscale");
+			zoomItem.addActionListener(e -> Plotter6165i.this.zoomFullscale(path));
+			toggleButtonPopup.add(zoomItem);
+			newButton.setComponentPopupMenu(toggleButtonPopup);
 			this.plotterPane.toggleButtons.add(newButton);
 			this.buttonPane.add(newButton);
 			this.controlPanel.pack();
 			this.plotterPane.paths.add(path);
+			this.plotterPane.semilogPaths.add(this.getSemiLogPath(path));
 			this.plotterPane.strokes.add(stroke);
 			this.plotterPane.colors.add(color);
 			this.plotterPane.visibilities.add(true);
@@ -1895,6 +1918,19 @@ public class Plotter6165i extends JInternalFrame {
 	}
 
 	/**
+	 * @param path
+	 * @return
+	 */
+	private Shape getSemiLogPath(final Shape path) {
+		if (path == null) {
+			return null;
+		}
+		return path instanceof java.awt.geom.Path2D.Double
+				? Plotter6165i.lINEAR_TO_SEMILOG_PATH_CONVERTER.apply((java.awt.geom.Path2D.Double) path)
+				: path;
+	}
+
+	/**
 	 * @return the top
 	 */
 	public int getTop() {
@@ -1935,6 +1971,18 @@ public class Plotter6165i extends JInternalFrame {
 			}
 		});
 		this.plotterPopupMenu.add(menuItemSave);
+
+		final JMenuItem menuItemToggleLog = new JMenuItem("Toggle semiLog");
+		menuItemToggleLog.addActionListener(e -> {
+			Plotter6165i.this.semiLog = !Plotter6165i.this.semiLog;
+			this.pathBounds = this.plotterPane.logPath.getBounds2D();
+			Plotter6165i.this.zoomFullscale(this.semiLog ? this.plotterPane.logPath : this.plotterPane.path);
+			this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, false);
+
+			Plotter6165i.this.repaint();
+		});
+
+		this.plotterPopupMenu.add(menuItemToggleLog);
 
 		this.buttonPane.setBackground(Color.getHSBColor(.436f, .35f, .7f));
 		final var label = new JLabel("Component Visibilities");
@@ -2157,12 +2205,31 @@ public class Plotter6165i extends JInternalFrame {
 
 	public void setMainPlotPath(final Shape path) {
 		this.plotterPane.path = path;
-		if (this.pathBounds == null) {
+		this.plotterPane.logPath = (java.awt.geom.Path2D.Double) this.getSemiLogPath(path);
+		if (this.pathBounds == null || true) {
 			this.pathBounds = this.plotterPane.path.getBounds2D();
+			this.plotterPane.dataBounds = (java.awt.geom.Rectangle2D.Double) this.pathBounds;
 			this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, false);
 		} else {
 			this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, true);
 		}
+
+		final var newButton = new JToggleButton(String.format("%d", 0), true);
+		newButton.setFont(this.contorlPanelFont1);
+		newButton.addActionListener(e -> Plotter6165i.this.plotterPane.repaint());
+		newButton.setUI(Plotter6165i.NEW_UI);
+		newButton.setBorderPainted(true);
+		this.plotterPane.toggleButtons.add(newButton);
+		this.buttonPane.add(newButton);
+
+		final var toggleButtonPopup = new JPopupMenu();
+		final var zoomItem = new JMenuItem("zoom to fullscale");
+		zoomItem.addActionListener(
+				e -> Plotter6165i.this.zoomFullscale(this.semiLog ? this.plotterPane.logPath : this.plotterPane.path));
+		toggleButtonPopup.add(zoomItem);
+		newButton.setComponentPopupMenu(toggleButtonPopup);
+
+		this.controlPanel.pack();
 
 	}
 
@@ -2273,6 +2340,16 @@ public class Plotter6165i extends JInternalFrame {
 	protected void shutdown() {
 		this.controlPanel.dispose();
 		this.dispose();
+	}
+
+	protected void zoomFullscale(final Shape path) {
+		final Rectangle2D bounds2d = path.getBounds2D();
+		this.pathToUnitBoxTransform = AffineTransform.getScaleInstance(1. / bounds2d.getWidth(),
+				1. / bounds2d.getHeight());
+		this.pathToUnitBoxTransform
+				.concatenate(AffineTransform.getTranslateInstance(-bounds2d.getX(), -bounds2d.getY()));
+		this.plotterPane.resetZoom();
+		this.repaint();
 	}
 
 }

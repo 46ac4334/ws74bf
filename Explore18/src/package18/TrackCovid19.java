@@ -1,5 +1,6 @@
 package package18;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.EventQueue;
@@ -11,6 +12,7 @@ import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
+import java.awt.geom.Path2D;
 import java.awt.image.BufferedImage;
 import java.beans.PropertyVetoException;
 import java.io.File;
@@ -386,6 +388,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	private List<CSVRecord> deathsUSRecords;
 
+	private final Dimension defaultPlotterSize = new Dimension(468, 375);
+
 	/**
 	 * The desktop on which the charts and tables will be displayed
 	 */
@@ -400,6 +404,10 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * The popup menu for the desktop.
 	 */
 	private final JPopupMenu desktopPopup;
+
+	private long firstDateMillis;
+
+	private final Map<String, Date> headerDateMap = new HashMap<>();
 
 	private Map<String, Integer> lookupheaderMap;
 
@@ -581,9 +589,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	protected void addToPool(final JButton2 jButton2) {
 		System.out.format("Adding to pool %s, %s%n", jButton2.getText(), jButton2.getParentPanel().getName());
 		this.pool.add(jButton2);
-		for (final JButton2 b : this.pool) {
-			System.out.format(" \u2022 %s, %s%n", b.getText(), b.getParentPanel().getName());
-		}
+//		for (final JButton2 b : this.pool) {
+//			System.out.format(" \u2022 %s, %s%n", b.getText(), b.getParentPanel().getName());
+//		}
 		this.showPool();
 	}
 
@@ -593,30 +601,16 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Analysis not yet implemented.");
 	}
 
-	private void analyzeCountry(final JButton2 button) {// TODO
+	private void analyzeCountry(final JButton2 button) {
 		final var countryName = button.getText();
 		final var cumulativeCounts = this.getCountsForCountry(countryName);
 		if (cumulativeCounts == null) {
 			System.out.format("counts are null for country %s%n", countryName);
 		}
-		final var cumulCountsIterator = cumulativeCounts.iterator();
-		System.out.format("analyzing %s%n", countryName);
-		final var plotter = new Plotter6165i();
-		plotter.setPreferredSize(new Dimension(460, 368));
-		this.desktop.add(plotter);
-		final var path = new java.awt.geom.Path2D.Double();
-		path.moveTo(0, 0);
-		var i = 0;
-		while (cumulCountsIterator.hasNext()) {
-			final var next = cumulCountsIterator.next();
-			path.lineTo(i, next);
-			++i;
+		if (cumulativeCounts.isEmpty()) {
+			System.out.format("counts are empty for country %s%n", countryName);
 		}
-		plotter.setMainPlotPath(path);
-		plotter.setPlotTitle(countryName);
-		plotter.pack();
-		plotter.setVisible(true);
-		this.arrangeWindows();
+		this.showPlot(countryName, cumulativeCounts);
 		return;
 	}
 
@@ -626,8 +620,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	public Object analyzeNow(final JButton2 button) {
-
-		System.out.format("%s%n", button.admin);
 
 		switch (button.admin) {
 		case country:
@@ -650,6 +642,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	private void analyzeProvince(final JButton2 button) {
+		Toolkit.getDefaultToolkit().beep();
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Province analysis not yet implemented.");
 	}
 
@@ -662,25 +655,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		if (cumulativeCounts.isEmpty()) {
 			System.out.format("counts are empty for state %s%n", stateName);
 		}
-		final var cumulCountsIterator = cumulativeCounts.iterator();
-		System.out.format("analyzing %s%n", stateName);
-		final var plotter = new Plotter6165i();
-		plotter.setPreferredSize(new Dimension(460, 368));
-		this.desktop.add(plotter);
-		final var path = new java.awt.geom.Path2D.Double();
-		path.moveTo(0, 0);
-//		path.lineTo(1, 1);
-		var i = 0;
-		while (cumulCountsIterator.hasNext()) {
-			final var next = cumulCountsIterator.next();
-			path.lineTo(i, next);
-			++i;
-		}
-		plotter.setMainPlotPath(path);
-		plotter.setPlotTitle(stateName);
-		plotter.pack();
-		plotter.setVisible(true);
-		this.arrangeWindows();
+		this.showPlot(stateName, cumulativeCounts);
 		return;
 
 	}
@@ -724,7 +699,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private void button2Action(final String text, final JButton2 jButton2) {
 
 		// The first character of text is a code indicating the type of button and
-		// action
+		// action, handled by the switch statement below
 
 		final var firstChar = text.charAt(0);
 		final var buttonText = text.substring(1);
@@ -765,7 +740,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param jButton2
 	 */
 	private void buttonCountryDeselected(final String countryName, final JButton2 jButton2) {
-		System.out.format("de-selected country %s%n", countryName);
 
 		if (countryName.equalsIgnoreCase("US")) {// de-select all selected states
 			final Set<ControlPanel> delenda = new HashSet<>();
@@ -774,7 +748,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			}
 			for (final ControlPanel d : delenda) {
 				this.countyWindows.remove(d);
-				System.out.format("de-selected state %s%n", d.getName());
 				d.dispose();
 			}
 
@@ -798,7 +771,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 */
 	private void buttonCountrySelected(final String countryName, final JButton2 jButton2) {
 		final var recordIndices = this.countryNames.get(countryName);
-		System.out.format("selected country %s%n", countryName);
 
 		if (recordIndices.size() > 1) {// If there is more than one province
 			final var showProvinces = this.showProvinces(recordIndices, this.confirmedGlobalRecords, jButton2);
@@ -818,7 +790,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param jButton2
 	 */
 	private void buttonCountyDeselecte(final String buttonText, final JButton2 jButton2) {
-		System.out.format("de-selected county %s, %s%n", buttonText, jButton2.getParentPanel().getName());
 	}
 
 	/**
@@ -826,7 +797,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param jButton2
 	 */
 	private void buttonCountySelected(final String countyName, final JButton2 jButton2) {
-		System.out.format("selected county %s, %s%n", countyName, jButton2.getParentPanel().getName());
 		this.analyzeCounty(jButton2);
 	}
 
@@ -834,7 +804,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param buttonText name of province
 	 */
 	private void buttonProvinceDeselected(final String buttonText, final JButton2 jButton2) {
-		System.out.format("de-selected province %s, %s%n", buttonText, jButton2.getParentPanel().getName());
 	}
 
 	/**
@@ -842,7 +811,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param jButton2
 	 */
 	private void buttonProvinceSelected(final String provinceName, final JButton2 jButton2) {
-		System.out.format("selected province %s, %s%n", provinceName, jButton2.getParentPanel().getName());
 		this.analyzeProvince(jButton2);
 	}
 
@@ -851,7 +819,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param jButton2
 	 */
 	private void buttonStateDeselected(final String buttonText, final JButton2 jButton2) {
-		System.out.format("de-selected state %s, %s%n", buttonText, jButton2.getParentPanel().getName());
 		final Set<ControlPanel> delenda = new HashSet<>();
 		for (final ControlPanel window : this.countyWindows) {
 			if (window.getName().equalsIgnoreCase(buttonText)) {
@@ -869,7 +836,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param jButton2  The state button
 	 */
 	private void buttonStateSelected(final String stateName, final JButton2 jButton2) {
-		System.out.format("selected state %s, %s%n", stateName, jButton2.getParentPanel().getName());
 
 		final var recordIndices = this.stateNames.get(stateName);
 
@@ -902,7 +868,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	private List<Integer> getCountsForCountry(final String countryName) {
-		System.out.format("getting counts for %s%n", countryName);
 
 		final var integer = this.confirmedGlobalheaderMap.get("Country/Region");
 		final List<Integer> result = new ArrayList<>();
@@ -911,8 +876,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			final var string = r.get(integer);
 			if (string.equalsIgnoreCase(countryName)) {
 
-				for (final String i : this.dateHeaderList) {
-					final var count = r.get(i);
+				for (final String dateHeader : this.dateHeaderList) {
+					final var count = r.get(dateHeader);
 					result.add(Integer.parseInt(count));
 				}
 				break;
@@ -923,10 +888,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	private List<Integer> getCountsForState(final String stateName) {
-		System.out.format("getting counts for %s%n", stateName);
 
 		final var columnIndex = this.confirmedUSheaderMap.get("Province_State");
-		System.out.format("columnIndex = %,d%n", columnIndex);
 		final List<Integer> dailyCounts = new ArrayList<>();
 
 		final Map<Date, Integer> dateCountMap = new TreeMap<>();
@@ -938,23 +901,17 @@ public class TrackCovid19 extends JFrame implements Runnable {
 				// sum over all counties.
 				for (final String dateHeader : this.dateHeaderList) {// iterate through all date column headers
 					final var dailyCountForCounty = Integer.parseInt(record.get(dateHeader));
-					try {
-						final var date = TrackCovid19.dateInstance.parse(dateHeader);
-						final Integer sum = dateCountMap.containsKey(date) ? dateCountMap.get(date) : 0;
-						final var newSum = sum + dailyCountForCounty;
-						System.out.format("%s %,d + %,d = %,d%n", date, sum, dailyCountForCounty, newSum);
-						dateCountMap.put(date, newSum);
-					} catch (final ParseException e) {
-						e.printStackTrace();
-					}
+					final var date = this.headerDateMap.get(dateHeader);
+					final Integer sum = dateCountMap.containsKey(date) ? dateCountMap.get(date) : 0;
+					final var newSum = sum + dailyCountForCounty;
+					dateCountMap.put(date, newSum);
 				}
 			}
 		}
 
 		// Copy sums from dateCountMap to dailyCounts
-		for (final Date key : dateCountMap.keySet()) {// TODO keys are not in date sort order!
+		for (final Date key : dateCountMap.keySet()) {
 			final var count = dateCountMap.get(key);
-			System.out.format("%s %,d%n", key, count);
 			dailyCounts.add(count);
 		}
 
@@ -1031,6 +988,19 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		return result;
 	}
 
+	/**
+	 * Generates a list of hypothesized underlying rate values, of which the values
+	 * given in the argument are assumed to be noisy samples.
+	 *
+	 * @param dailyCounts
+	 * @return
+	 */
+	private List<Double> hypothesize(final List<Integer> dailyCounts) {
+		final var sevenDayAverage = new SevenDayAverage();
+		final var result = sevenDayAverage.apply(dailyCounts);
+		return result;
+	}
+
 	private void minimize() {
 		this.setExtendedState(Frame.ICONIFIED);
 	}
@@ -1044,18 +1014,23 @@ public class TrackCovid19 extends JFrame implements Runnable {
 				System.out.format("%,5d %s%n", headerMap.get(key), key);
 			} else {
 				if (firstDate) {
+					try {
+						this.firstDateMillis = TrackCovid19.dateInstance.parse(key).getTime();
+					} catch (final ParseException e) {
+						e.printStackTrace();
+					}
 					System.out.format("%5s %s%n", "\u2022", " ");
 					System.out.format("%5s %s%n", "\u2022", "Dates");
 					System.out.format("%5s %s%n", "\u2022", " ");
 					firstDate = false;
 				}
-				try {
-					if (this.buildStateHeaderList) {
-						this.dateHeaderList.add(key);
+				if (this.buildStateHeaderList) {
+					this.dateHeaderList.add(key);
+					try {
+						this.headerDateMap.put(key, TrackCovid19.dateInstance.parse(key));
+					} catch (final ParseException e) {
+						e.printStackTrace();
 					}
-					final var date = TrackCovid19.dateInstance.parse(key);
-				} catch (final ParseException e) {
-					e.printStackTrace();
 				}
 			}
 		}
@@ -1063,11 +1038,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	public Object removeFromPool(final JButton2 jButton2) {
-		System.out.format("Removing from pool %s, %s%n", jButton2.getText(), jButton2.getParentPanel().getName());
 		this.pool.remove(jButton2);
-		for (final JButton2 b : this.pool) {
-			System.out.format(" \u2022 %s, %s%n", b.getText(), b.getParentPanel().getName());
-		}
 		this.showPool();
 		return null;
 	}
@@ -1186,6 +1157,54 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		return countyButtons;
 	}
 
+	/**
+	 * @param name             The title to appear on the plot
+	 * @param cumulativeCounts The values to be plotted
+	 */
+	private void showPlot(final String name, final List<Integer> cumulativeCounts) {
+		final var cumulCountsIterator = cumulativeCounts.iterator();
+		final var plotter = new Plotter6165i();
+		plotter.setIconifiable(true);
+		plotter.setPreferredSize(this.defaultPlotterSize);
+		this.desktop.add(plotter);
+		plotter.setXDateOrigin(this.firstDateMillis);
+		final var cumulPath = new java.awt.geom.Path2D.Double();
+		cumulPath.moveTo(0, 0);
+		final var dailyPath = new java.awt.geom.Path2D.Double();
+		dailyPath.moveTo(0, 0);
+		final var hypoPath = new Path2D.Double();
+		hypoPath.moveTo(0, 0);
+		var i = 0;
+		Integer oldCumul = 0;
+		final List<Integer> dailyCounts = new ArrayList<>();
+		while (cumulCountsIterator.hasNext()) {
+			final var cumulCount = cumulCountsIterator.next();
+			final var dailyCount = cumulCount - oldCumul;
+			dailyCounts.add(dailyCount);
+			cumulPath.lineTo(i, cumulCount);
+			dailyPath.lineTo(i, dailyCount);
+			oldCumul = cumulCount;
+			++i;
+		}
+		final var hypothesizedRates = this.hypothesize(dailyCounts);
+		final var iterator = hypothesizedRates.iterator();
+		i = 0;
+		while (iterator.hasNext()) {
+			final double hypoRate = iterator.next();
+			hypoPath.lineTo(i, hypoRate);
+			++i;
+		}
+		plotter.setMainPlotPath(cumulPath);
+		plotter.addPlotPath(Color.red.darker(), dailyPath, new BasicStroke(1));
+		plotter.addPlotPath(Color.green.darker(), hypoPath, new BasicStroke(1.5f));
+		plotter.setIconifiable(true);
+		plotter.setPlotTitle(name);
+		plotter.setTitle(name);
+		plotter.pack();
+		plotter.setVisible(true);
+		this.arrangeWindows();
+	}
+
 	private ControlPanel showPool() {
 		if (this.poolFrame == null) {
 			this.poolFrame = new ControlPanel("Pool", null);
@@ -1215,7 +1234,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			final var e = new JLabel(p.getText());
 			e.setBorder(border);
 			this.poolLabels.add(e);
-			System.out.println("added " + p.getText() + " to poolLabels.");
 		}
 		for (final JLabel l : this.poolLabels) {
 			this.poolPanel.add(l);

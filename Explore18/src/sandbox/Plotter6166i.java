@@ -45,6 +45,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -58,7 +59,6 @@ import javax.swing.ToolTipManager;
 import javax.swing.WindowConstants;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 import javax.swing.plaf.metal.MetalToggleButtonUI;
-
 
 /**
  * @author 46ac4334
@@ -81,7 +81,9 @@ public class Plotter6166i extends JInternalFrame {
 		}
 
 		private void init() {
-			this.setResizable(false);
+			this.setResizable(true);
+			this.setIconifiable(true);
+			this.setMaximizable(true);
 			this.addComponentListener(new ComponentListener() {
 
 				@Override
@@ -141,7 +143,7 @@ public class Plotter6166i extends JInternalFrame {
 	}
 
 	/**
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	public interface Painter1 {
@@ -1181,7 +1183,7 @@ public class Plotter6166i extends JInternalFrame {
 	}
 
 	/**
-	 * @author Raimo Bakis
+	 * @author 46ac4334
 	 *
 	 */
 	public class TextItem {
@@ -1411,6 +1413,7 @@ public class Plotter6166i extends JInternalFrame {
 	private AffineTransform pathToUnitBoxTransform;
 
 	private final PlotterPane plotterPane = new PlotterPane();
+	private final PlotterPane plotterPane2 = new PlotterPane();
 
 	/**
 	 * The default size of the plotter pane.
@@ -1918,7 +1921,13 @@ public class Plotter6166i extends JInternalFrame {
 	private void init() {
 		this.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
 		this.setResizable(true);
-		this.setContentPane(this.plotterPane);
+		final var contentPanel = new JPanel();
+		new BoxLayout(contentPanel, BoxLayout.Y_AXIS);
+		contentPanel.add(this.plotterPane);
+		contentPanel.add(this.plotterPane2);
+		this.plotterPane2.setPreferredSize(this.plotterPaneDefaultDimension);
+		this.plotterPane2.setBackground(Color.WHITE);
+		this.setContentPane(contentPanel);
 		this.plotterPane.setPreferredSize(this.plotterPaneDefaultDimension);
 		this.plotterPane.setComponentPopupMenu(this.plotterPopupMenu);
 
