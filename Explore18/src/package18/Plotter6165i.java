@@ -408,6 +408,20 @@ public class Plotter6165i extends JInternalFrame {
 		public void componentShown(final ComponentEvent e) {
 		}
 
+		private void drawTheYAxisLabel(final Graphics2D g, final String text) {
+			final Color oldColor = g.getColor();
+			String text2 = text+" ―→";
+			@SuppressWarnings("unused")
+			final Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(text2, g);
+			final double centerY = this.getHeight() - Plotter6165i.this.bottom;
+			final double centerX = Plotter6165i.this.left * 0.3;
+			g.rotate(-Math.PI / 2, centerX, centerY);
+			g.setColor(Color.BLACK);
+			g.drawString(text2, (float) centerX, (float) centerY);
+			g.rotate(Math.PI / 2, centerX, centerY);
+			g.setColor(oldColor);
+		}
+
 		/**
 		 * @param g
 		 * @param pathIterator2
@@ -503,13 +517,6 @@ public class Plotter6165i extends JInternalFrame {
 			return this.plotColor;
 		}
 
-		/**
-		 * @return the plotStroke
-		 */
-		public Stroke getPlotStroke() {
-			return this.plotStroke;
-		}
-
 //		private AffineTransform getPlotTransform(final double s, final AffineTransform pan) {
 //			final AffineTransform plotTransform = new AffineTransform(this.transform);
 //			if (Plotter6165i.this.pathToUnitBoxTransform == null) {
@@ -523,6 +530,13 @@ public class Plotter6165i extends JInternalFrame {
 //			}
 //			return plotTransform;
 //		}
+
+		/**
+		 * @return the plotStroke
+		 */
+		public Stroke getPlotStroke() {
+			return this.plotStroke;
+		}
 
 		private AffineTransform getPlotTransform(final double sx2, final double sy2, final AffineTransform pan2) {
 			final var plotTransform = new AffineTransform(
@@ -890,6 +904,10 @@ public class Plotter6165i extends JInternalFrame {
 				}
 				if (Plotter6165i.this.plotTitle != null && !Plotter6165i.this.plotTitle.isEmpty()) {
 					this.plotTheTitle(g, w);
+				}
+				Plotter6165i.this.yAxisLabelText = (Plotter6165i.this.semiLog ? "Logarithmic" : "Linear") + " Scale";
+				if (Plotter6165i.this.yAxisLabelText != null && !Plotter6165i.this.yAxisLabelText.isEmpty()) {
+					this.drawTheYAxisLabel(g, Plotter6165i.this.yAxisLabelText);
 				}
 
 				for (final LegendItem li : Plotter6165i.this.legendItems) {
@@ -1476,6 +1494,8 @@ public class Plotter6165i extends JInternalFrame {
 	private double[] xTicks2;
 
 	private double[] xTicks3;
+
+	public String yAxisLabelText;
 
 	private final Path2D yGrid = new Path2D.Double();
 
@@ -2206,13 +2226,9 @@ public class Plotter6165i extends JInternalFrame {
 	public void setMainPlotPath(final Shape path) {
 		this.plotterPane.path = path;
 		this.plotterPane.logPath = (java.awt.geom.Path2D.Double) this.getSemiLogPath(path);
-		if (this.pathBounds == null || true) {
-			this.pathBounds = this.plotterPane.path.getBounds2D();
-			this.plotterPane.dataBounds = (java.awt.geom.Rectangle2D.Double) this.pathBounds;
-			this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, false);
-		} else {
-			this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, true);
-		}
+		this.pathBounds = this.plotterPane.path.getBounds2D();
+		this.plotterPane.dataBounds = (java.awt.geom.Rectangle2D.Double) this.pathBounds;
+		this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, false);
 
 		final var newButton = new JToggleButton(String.format("%d", 0), true);
 		newButton.setFont(this.contorlPanelFont1);
