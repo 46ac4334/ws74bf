@@ -59,8 +59,6 @@ import javax.swing.WindowConstants;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 import javax.swing.plaf.metal.MetalToggleButtonUI;
 
-//import package18.Plotter6165i.PlotterPane;
-
 /**
  * @author 46ac4334
  *
@@ -410,7 +408,7 @@ public class Plotter6165i extends JInternalFrame {
 
 		private void drawTheYAxisLabel(final Graphics2D g, final String text) {
 			final Color oldColor = g.getColor();
-			String text2 = text+" ―→";
+			final String text2 = text + " ―→";
 			@SuppressWarnings("unused")
 			final Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(text2, g);
 			final double centerY = this.getHeight() - Plotter6165i.this.bottom;
@@ -2226,7 +2224,7 @@ public class Plotter6165i extends JInternalFrame {
 	public void setMainPlotPath(final Shape path) {
 		this.plotterPane.path = path;
 		this.plotterPane.logPath = (java.awt.geom.Path2D.Double) this.getSemiLogPath(path);
-		this.pathBounds = this.plotterPane.path.getBounds2D();
+		this.pathBounds = (this.semiLog ? this.plotterPane.logPath : this.plotterPane.path).getBounds2D();
 		this.plotterPane.dataBounds = (java.awt.geom.Rectangle2D.Double) this.pathBounds;
 		this.createGrid(this.plotterPane.dataBounds == null ? this.pathBounds : this.plotterPane.dataBounds, false);
 

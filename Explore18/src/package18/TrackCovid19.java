@@ -1194,9 +1194,11 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			hypoPath.lineTo(i, hypoRate);
 			++i;
 		}
-		plotter.setMainPlotPath(cumulPath);
-		plotter.addPlotPath(Color.red.darker(), dailyPath, new BasicStroke(1));
-		plotter.addPlotPath(Color.green.darker(), hypoPath, new BasicStroke(1.5f));
+//		plotter.setMainPlotPath(cumulPath);
+//		plotter.addPlotPath(Color.red.darker(), dailyPath, new BasicStroke(1));
+//		plotter.addPlotPath(Color.green.darker(), hypoPath, new BasicStroke(1.5f));
+		plotter.setSemiLog(true);
+		plotter.setMainPlotPath(hypoPath);
 		plotter.setIconifiable(true);
 		plotter.setPlotTitle(name);
 		plotter.setTitle(name);

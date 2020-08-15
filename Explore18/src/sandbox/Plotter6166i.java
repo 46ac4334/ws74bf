@@ -275,7 +275,6 @@ public class Plotter6166i extends JInternalFrame {
 
 		private final JPopupMenu textAreaPopup = new JPopupMenu();
 
-//		public List<JToggleButton> toggleButtons = new ArrayList<>();
 		public List<JToggleButton> toggleButtons = new ArrayList<>();
 
 		private AffineTransform transform;
