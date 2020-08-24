@@ -408,11 +408,11 @@ public class Plotter6165i extends JInternalFrame {
 
 		private void drawTheYAxisLabel(final Graphics2D g, final String text) {
 			final Color oldColor = g.getColor();
-			final String text2 = text + " ―→";
-			@SuppressWarnings("unused")
+			final String text2 = text/* + " ―→" */;
 			final Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(text2, g);
-			final double centerY = this.getHeight() - Plotter6165i.this.bottom;
-			final double centerX = Plotter6165i.this.left * 0.3;
+			final double centerY = (this.getHeight() - Plotter6165i.this.bottom + Plotter6165i.this.top) / 2
+					+ stringBounds.getCenterX();
+			final double centerX = stringBounds.getHeight();
 			g.rotate(-Math.PI / 2, centerX, centerY);
 			g.setColor(Color.BLACK);
 			g.drawString(text2, (float) centerX, (float) centerY);
@@ -1428,7 +1428,7 @@ public class Plotter6165i extends JInternalFrame {
 	/**
 	 * inset of plot window from the left edge of the pane
 	 */
-	private int left = 60;
+	private int left = 62;
 
 	private final List<LegendItem> legendItems = new ArrayList<>();
 

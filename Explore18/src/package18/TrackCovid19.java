@@ -1,6 +1,5 @@
 package package18;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.EventQueue;
@@ -22,9 +21,11 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,6 +50,7 @@ import javax.swing.WindowConstants;
 import javax.swing.border.BevelBorder;
 
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
 /**
@@ -59,6 +61,298 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	public enum ADMIN {
 		country, county, province, state
+	}
+
+	@SuppressWarnings("unused")
+	private class Area {
+
+		private class Key implements Comparable<Key> {
+
+			/**
+			 * Name of the County in a state in U.S.
+			 */
+			private final String admin2;
+
+			/**
+			 * Name of the country or region
+			 */
+			private final String country_Region;
+
+			/**
+			 * The name of the province or state
+			 */
+			private final String province_State;
+
+			public Key(final String admin2, final String province_State, final String country_Region) {
+				this.admin2 = admin2 == null || admin2.isBlank() ? null : admin2;
+				this.province_State = province_State == null || province_State.isBlank() ? null : province_State;
+				this.country_Region = country_Region == null || country_Region.isBlank() ? null : country_Region;
+			}
+
+			@Override
+			public int compareTo(final Key other) {
+				final String thisCountry = this.country_Region == null ? "" : this.country_Region;
+				final String otherCountry = other.country_Region == null ? "" : other.country_Region;
+				final int cCountry = thisCountry.compareTo(otherCountry);
+				if (cCountry == 0) {
+					final String thisState = this.province_State == null ? "" : this.province_State;
+					final String otherState = other.province_State == null ? "" : other.province_State;
+					final int cProvince = thisState.compareTo(otherState);
+					if (cProvince == 0) {
+						final String thisCounty = this.admin2 == null ? "" : this.admin2;
+						final String otherCounty = other.admin2 == null ? "" : other.admin2;
+						return thisCounty.compareTo(otherCounty);
+					} else {
+						return cProvince;
+					}
+				} else {
+					return cCountry;
+				}
+			}
+		}
+
+		/**
+		 * The cumulative number of confirmed cases at each date
+		 */
+		private List<Long> confirmed;
+
+		/**
+		 * The dates for which data is provided
+		 */
+		private List<Long> dates;
+
+		/**
+		 * The cumulative number of deaths at each date
+		 */
+		private List<Long> deaths;
+
+		/**
+		 * The first date for which data is proviced
+		 */
+		private long firstDateMillis;
+
+		private final Key key;
+
+		/**
+		 * The population of the area
+		 */
+		private long population;
+
+		/**
+		 * The cumulative number of recovered patients at each date
+		 */
+		private List<Long> recovered;
+
+		public Area(final CSVRecord r) {
+			final CSVParser parser = r.getParser();
+			final List<String> headerNames = parser.getHeaderNames();
+
+			final String s = headerNames.contains("Country/Region") ? r.get("Country/Region") : r.get("Country_Region");
+			final String country_Region = s == null || s.isEmpty() ? null : s;
+
+			final String s2 = headerNames.contains("Province/State") ? r.get("Province/State")
+					: r.get("Province_State");
+			final String province_State = s2 == null || s2.isEmpty() ? null : s2;
+
+			final String s3 = headerNames.contains("Admin2") ? r.get("Admin2") : null;
+			final String admin2 = s3 == null || s3.isEmpty() ? null : s3;
+
+			this.key = new Key(admin2, province_State, country_Region);
+
+			/*
+			 * TODO this constructor can only fill in one of "confirmed", "deaths", or
+			 * "recovered", but it doesn't know which unless it has the file name. But could
+			 * it have access to all the files? It effectively does because these are all
+			 * instance fields in the enclosing class. Still, it needs to know which file
+			 * the give record (argument to this constructor) came from.
+			 */
+
+			var firstDate = true;
+			for (final String key1 : headerNames) {
+				if (key1.matches(TrackCovid19.datePattern)) {
+					if (firstDate) {
+						try {
+							this.firstDateMillis = TrackCovid19.dateInstance.parse(key1).getTime();
+						} catch (final ParseException e) {
+							e.printStackTrace();
+						}
+						firstDate = false;
+					}
+
+				}
+
+			}
+
+		}
+
+		/**
+		 * Constructor from the name of the country or region.
+		 *
+		 * @param country_Region Name of the country or region.
+		 */
+		public Area(final String country_Region) {
+			this.key = new Key(null, null, country_Region);
+		}
+
+		/**
+		 * Constructor from the name of the province or state, and the country or
+		 * region.
+		 *
+		 * @param province_State
+		 * @param country_Region
+		 */
+		public Area(final String province_State, final String country_Region) {
+			this.key = new Key(null, province_State, country_Region);
+		}
+
+		/**
+		 * Constructor from the name of the county, state, and country
+		 *
+		 * @param admin2         Name of the county.
+		 * @param province_State Name of the state
+		 * @param country_Region Name of the country
+		 */
+		public Area(final String admin2, final String province_State, final String country_Region) {
+			this.key = new Key(admin2, province_State, country_Region);
+		}
+
+		/**
+		 * Returns the name of the county.
+		 *
+		 * @return the admin2
+		 */
+		public String getAdmin2() {
+			return this.key.admin2;
+		}
+
+		/**
+		 * Returns a list containing the cumulative count of confirmed cases at each
+		 * date.
+		 *
+		 * @return the confirmed
+		 */
+		public List<Long> getConfirmed() {
+			return Collections.unmodifiableList(this.confirmed);
+		}
+
+		/**
+		 * @return the country_Region
+		 */
+		public String getCountry() {
+			return this.key.country_Region;
+		}
+
+		/**
+		 * @return the country_Region
+		 */
+		public String getCountry_Region() {
+			return this.key.country_Region;
+		}
+
+		/**
+		 * @return the admin2
+		 */
+		public String getCounty() {
+			return this.key.admin2;
+		}
+
+		/**
+		 * @return the dates
+		 */
+		public List<Long> getDates() {
+			return Collections.unmodifiableList(this.dates);
+		}
+
+		/**
+		 * @return the deaths
+		 */
+		public List<Long> getDeaths() {
+			return Collections.unmodifiableList(this.deaths);
+		}
+
+		/**
+		 * @return the population
+		 */
+		public long getPopulation() {
+			return this.population;
+		}
+
+		/**
+		 * @return the province_State
+		 */
+		public String getProvince() {
+			return this.key.province_State;
+		}
+
+		/**
+		 * @return the province_State
+		 */
+		public String getProvince_State() {
+			return this.key.province_State;
+		}
+
+		/**
+		 * @return the recovered
+		 */
+		public List<Long> getRecovered() {
+			return Collections.unmodifiableList(this.recovered);
+		}
+
+		/**
+		 * @return the country_Region
+		 */
+		public String getRegion() {
+			return this.key.country_Region;
+		}
+
+		/**
+		 * @return the province_State
+		 */
+		public String getState() {
+			return this.key.province_State;
+		}
+
+		/**
+		 * @param index     the day index relative to the start date
+		 * @param confirmed the confirmed count to set.
+		 */
+		public void setConfirmed(final int index, final long confirmed) {
+			if (index < this.confirmed.size()) {
+				this.confirmed.set(index, confirmed);
+			} else {
+				final String msg = String.format("index = %,d but list size is %,d", index, this.confirmed.size());
+				throw new IllegalArgumentException(msg);
+			}
+
+		}
+
+		/**
+		 * @param dates the dates to set
+		 */
+		public void setDates(final List<Long> dates) {
+			this.dates = dates;
+		}
+
+		/**
+		 * @param deaths the deaths to set
+		 */
+		public void setDeaths(final List<Long> deaths) {
+			this.deaths = deaths;
+		}
+
+		/**
+		 * @param population the population to set
+		 */
+		public void setPopulation(final long population) {
+			this.population = population;
+		}
+
+		/**
+		 * @param recovered the recovered to set
+		 */
+		public void setRecovered(final List<Long> recovered) {
+			this.recovered = recovered;
+		}
 	}
 
 	/**
@@ -411,7 +705,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	private Map<String, Integer> lookupheaderMap;
 
-	@SuppressWarnings("unused")
 	private List<CSVRecord> lookupRecords;
 
 	private final File lookupTable;
@@ -494,41 +787,52 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 		this.confirmedGlobalFile = new File(this.timeSeriesDir, TrackCovid19.CONFIRMED_GLOBAL_FILE_NAME);
 		if (this.confirmedGlobalFile.canRead()) {
-			System.out.println("✔ Confirmed Global file found. " + new Date(this.confirmedGlobalFile.lastModified()));
+			System.out.println("✔ Confirmed Global file found. " + new Date(this.confirmedGlobalFile.lastModified())
+					+ " " + this.confirmedGlobalFile.getName());
 		} else {
 			System.out.println("🗙 Confirmed Global file NOT found.");
 		}
 
 		this.confirmedUSFile = new File(this.timeSeriesDir, TrackCovid19.CONFIRMED_US_FILE_NAME);
 		if (this.confirmedUSFile.canRead()) {
-			System.out.println("✔ Confirmed US file found.     " + new Date(this.confirmedUSFile.lastModified()));
+			System.out.println("✔ Confirmed US file found.     " + new Date(this.confirmedUSFile.lastModified()) + " "
+					+ this.confirmedUSFile.getName());
 		} else {
 			System.out.println("🗙 Confirmed US file NOT found.");
 		}
 
 		this.deathsGlobalFile = new File(this.timeSeriesDir, TrackCovid19.DEATHS_GLOBAL_FILE_NAME);
 		if (this.deathsGlobalFile.canRead()) {
-			System.out.println("✔ Deaths Global file found.    " + new Date(this.deathsGlobalFile.lastModified()));
+			System.out.println("✔ Deaths Global file found.    " + new Date(this.deathsGlobalFile.lastModified()) + " "
+					+ this.deathsGlobalFile.getName());
 		} else {
 			System.out.println("🗙 Deaths Global file NOT found.");
 		}
 
 		this.deathsUSFile = new File(this.timeSeriesDir, TrackCovid19.DEATHS_US_FILE_NAME);
 		if (this.deathsUSFile.canRead()) {
-			System.out.println("✔ Deaths US file found.        " + new Date(this.deathsUSFile.lastModified()));
+			System.out.println("✔ Deaths US file found.        " + new Date(this.deathsUSFile.lastModified()) + " "
+					+ this.deathsUSFile.getName());
 		} else {
 			System.out.println("🗙 Deaths US file NOT found.");
 		}
 
 		this.recoveredGlobalFile = new File(this.timeSeriesDir, TrackCovid19.RECOVERED_GLOBAL_FILE_NAME);
 		if (this.recoveredGlobalFile.canRead()) {
-			System.out.println("✔ Recovered Global file found. " + new Date(this.recoveredGlobalFile.lastModified()));
+			System.out.println("✔ Recovered Global file found. " + new Date(this.recoveredGlobalFile.lastModified())
+					+ " " + this.recoveredGlobalFile.getName());
 		} else {
 			System.out.println("🗙 Recovered Global file NOT found.");
 		}
 
 		final var parentFile = this.timeSeriesDir.getParentFile();
 		this.lookupTable = new File(parentFile, "UID_ISO_FIPS_LookUp_Table.csv");
+		if (this.lookupTable.canRead()) {
+			System.out.println("✔ Lookup table file found.     " + new Date(this.lookupTable.lastModified()) + " "
+					+ this.lookupTable.getName());
+		} else {
+			System.out.println("🗙 Lookup table file NOT found.");
+		}
 
 		try {
 			var reader = new FileReader(this.confirmedGlobalFile);
@@ -599,6 +903,26 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private void analyze() {
 		Toolkit.getDefaultToolkit().beep();
 		JOptionPane.showInternalMessageDialog(this.scrollPane, "Analysis not yet implemented.");
+	}
+
+	/**
+	 * @param string               comma-separated names of header maps and records.
+	 * @param headerMapsAndRecords header maps followed by csv records.
+	 */
+	private void analyzeCombinedKeys(final String string, final Object... headerMapsAndRecords) {
+		// TODO Auto-generated method stub
+		final String[] split = string.split(",");
+		System.out.println(split.length + " files");
+		int i = 0;
+		for (final String s : split) {
+			System.out.println(s);
+			@SuppressWarnings("unchecked")
+			final Map<String, Integer> headerMap = (Map<String, Integer>) headerMapsAndRecords[i];
+			final Object combinedKeyColumn = headerMap.get("Combined_Key");
+			System.out.format("  Combined_Key in column %s%n%n", combinedKeyColumn);
+			++i;
+		}
+
 	}
 
 	private void analyzeCountry(final JButton2 button) {
@@ -846,6 +1170,92 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	}
 
+	private void examineCountryRecords(final Set<CSVRecord> countryRecords) {
+		// TODO Auto-generated method stub
+		long countryOnlySum = 0;
+		int blankCount = 0;
+		long countryProvinceSum = 0;
+		int countryProvinceCount = 0;
+		long countySum = 0;
+		int countyCount = 0;
+		final Iterator<CSVRecord> iterator = countryRecords.iterator();
+		while (iterator.hasNext()) {
+			final CSVRecord record = iterator.next();
+			final String popString = record.get("Population");
+			final long pop = popString.isBlank() ? 0 : Long.parseLong(popString);
+			if (record.get("Province_State").isBlank()) {
+				countryOnlySum += pop;
+				blankCount++;
+			} else if (record.get("Admin2").isBlank()) {
+				countryProvinceSum += pop;
+				countryProvinceCount++;
+			} else {
+				countySum += pop;
+				countyCount++;
+			}
+		}
+		System.out.format(
+				"    countryOnlySum = %,14d (%,d)%ncountryProvinceSum = %,14d (%,d)%n              diff = %,14d%n",
+				countryOnlySum, blankCount, countryProvinceSum, countryProvinceCount,
+				countryOnlySum - countryProvinceSum);
+		if (countyCount > 0) {
+			System.out.format("         countySum = %,14d (%,d)%n", countySum, countyCount);
+		}
+
+	}
+
+	@SuppressWarnings("unused")
+	private void examineKeys() {
+		/*
+		 * TODO the Global file does not have a combined key, but US and lookup do have
+		 * combined keys. Find the differences between the combined keys constructed by
+		 * getCombinedKey from the US file and the lookup file, and also between the
+		 * combined keys constructed from the global file and the lookup file. Also
+		 * compare each constructed combined key with the one listed in column 10 in the
+		 * US and lookup files.
+		 */
+
+	}
+
+	@SuppressWarnings("unused")
+	private String getCombinedKey(final String Admin2, final String Province_State, final String Country_Region) {
+		final StringBuilder sb = new StringBuilder();
+		if (!Admin2.strip().isEmpty()) {
+			sb.append(Admin2);
+			sb.append(",");
+		}
+		if (!Province_State.strip().isEmpty()) {
+			sb.append(Province_State);
+			sb.append(",");
+		}
+		if (!Admin2.strip().isEmpty()) {
+			sb.append(Admin2);
+			sb.append(",");
+		}
+		if (!Country_Region.strip().isEmpty()) {
+			sb.append(Country_Region);
+		}
+		final String result = sb.toString();
+		return result;
+	}
+
+	/**
+	 * @param countryMap0
+	 */
+	private Map<String, Set<CSVRecord>> getCountryMap() {
+		final Map<String, Set<CSVRecord>> countryMap0 = new TreeMap<>();
+		final Iterator<CSVRecord> lookupIterator = this.lookupRecords.iterator();
+		while (lookupIterator.hasNext()) {
+			final CSVRecord lookupRecord = lookupIterator.next();
+			final String country = lookupRecord.get("Country_Region");
+			final Set<CSVRecord> countryRecords = countryMap0.containsKey(country) ? countryMap0.get(country)
+					: new HashSet<>();
+			countryRecords.add(lookupRecord);
+			countryMap0.put(country, countryRecords);
+		}
+		return countryMap0;
+	}
+
 	/**
 	 * @param headerMap
 	 * @param records
@@ -968,6 +1378,84 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	/**
+	 * <p>
+	 * Accepts the name of the region in some semi-standardized but hopefully
+	 * tolerant format, returns the population of that region. Region may be:
+	 * <ol>
+	 * <li>state, country</li>
+	 * <li>province, country</li>
+	 * <li>county, state, country</li>
+	 * <li>country</li>
+	 * <li>&ldquo;world&rdquo;</li>
+	 * </ol>
+	 * Some countries have a home region and territories. In that case, for example
+	 * <b>Denmark</b> refers to the home country and <b>Great Denmark</b> or
+	 * <b>Greater Denmark</b> or <b>Gr. Denmark</b> includes the remote parts.
+	 * </p>
+	 * <p>
+	 * In order to do this, the method first translates the argument into a
+	 * standard, internal format, not necessarily serializable. Then it compiles a
+	 * list of population-table entries to be summed, and returns the total.
+	 * </p>
+	 * <p>
+	 * The first version will not tolerate spelling errors but will accept
+	 * abbreviations in the form of truncation.
+	 * </p>
+	 * <p>
+	 * Actually, since it will only be invoked programmatically, it need not be very
+	 * tolerant.
+	 * </p>
+	 *
+	 * @param name Name of region
+	 * @return population of region
+	 */
+	long getPopulation(final String name) {// TODO not done
+		/*
+		 * Compile a list of all entities mentioned
+		 */
+		// TODO
+
+		/*
+		 * Study: Does the total for e.g. Mexico equal the components Aguascalientes,
+		 * Baja California, ... ?
+		 *
+		 * The relevant columns in the lookup file are: 5 Admin2, 6 Province_State, and
+		 * 7 Country_Region
+		 *
+		 * Population is in column 11 as an integer without grouping commas or spaces.
+		 *
+		 */
+		/*
+		 * We cannot rely on the records in the source file being in any particular
+		 * order. Therefore, I will generate a new Map in which each key is a country
+		 * and the value is the set of all those records which have that name in the
+		 * "Country_Region" column.
+		 */
+
+		/*
+		 * Sort all lookup-table records by country:
+		 */
+		final Map<String, Set<CSVRecord>> countryMap0 = this.getCountryMap();
+		final Map<String, Set<CSVRecord>> countryMap = countryMap0;
+
+		/*
+		 * For testing: list the countries
+		 */
+		System.out.format("%,d countries:%n", countryMap.size());
+		for (final String countryName : countryMap.keySet()) {
+			final Set<CSVRecord> countryRecords = countryMap.get(countryName);
+			final int size = countryRecords.size();
+			System.out.format("%,8d %s%n", size, countryName);
+			if (size > 1) {
+				this.examineCountryRecords(countryRecords);
+			}
+		}
+
+		final long result = 0;
+		return result;
+	}
+
+	/**
 	 * @param headerMap
 	 * @param records
 	 * @return Map in which the key is a country name and the value is a set of row
@@ -1066,23 +1554,42 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		System.out.format("%,8d deaths global records%n", this.deathsGlobalRecords.size());
 		System.out.format("%,8d deaths us records%n", this.deathsUSRecords.size());
 		System.out.format("%,8d recovered global records%n", this.recoveredGlobalRecords.size());
+		System.out.format("%,8d lookup records%n", this.lookupRecords.size());
 		System.out.println();
 		System.out.format("%,8d entries in confirmedGlobalheaderMap%n", this.confirmedGlobalheaderMap.size());
 		System.out.format("%,8d entries in confirmedUSheaderMap%n", this.confirmedUSheaderMap.size());
 		System.out.format("%,8d entries in deathsGlobalheaderMap%n", this.deathsGlobalheaderMap.size());
 		System.out.format("%,8d entries in deathsUSheaderMap%n", this.deathsUSheaderMap.size());
 		System.out.format("%,8d entries in recoveredGlobalheaderMap%n", this.recoveredGlobalheaderMap.size());
+		System.out.format("%,8d entries in lookupheaderMap%n", this.lookupheaderMap.size());
 		System.out.println();
 
-		System.out.println("Global header map");
+		System.out.println("Confirmed Global header map");
 		this.printHeaderMap(this.confirmedGlobalheaderMap);
 		System.out.println();
-		System.out.println("US header map");
+		System.out.println("Confirmed US header map");
 		this.printHeaderMap(this.confirmedUSheaderMap);
+		System.out.println();
+		System.out.println("Deaths Global header map");
+		this.printHeaderMap(this.deathsGlobalheaderMap);
+		System.out.println();
+		System.out.println("Deaths US header map");
+		this.printHeaderMap(this.deathsUSheaderMap);
+		System.out.println();
+		System.out.println("Recovered Global header map");
+		this.printHeaderMap(this.recoveredGlobalheaderMap);
 		System.out.println();
 		System.out.println("lookup header map");
 		this.printHeaderMap(this.lookupheaderMap);
 		System.out.println();
+
+		this.analyzeCombinedKeys(
+				"confirmedGlobalheaderMap,confirmedUSheaderMap,deathsGlobalheaderMap,"
+						+ "deathsUSheaderMap,recoveredGlobalheaderMap,lookupheaderMap",
+				this.confirmedGlobalheaderMap, this.confirmedUSheaderMap, this.deathsGlobalheaderMap,
+				this.deathsUSheaderMap, this.recoveredGlobalheaderMap, this.lookupheaderMap,
+				this.confirmedGlobalRecords, this.confirmedUSRecords, this.deathsGlobalRecords, this.deathsUSRecords,
+				this.recoveredGlobalRecords, this.lookupRecords);
 
 		this.countryNames = this.getCountryNames(this.confirmedGlobalheaderMap, this.confirmedGlobalRecords);
 		for (final String country : this.countryNames.keySet()) {
@@ -1090,6 +1597,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		}
 
 		this.stateNames = this.getStateNames(this.confirmedUSheaderMap, this.confirmedUSRecords);
+
+		this.getPopulation("Angola");
+//		System.exit(7);
 
 	}
 
