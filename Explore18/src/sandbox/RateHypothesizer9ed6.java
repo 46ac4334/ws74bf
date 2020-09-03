@@ -30,13 +30,13 @@ public class RateHypothesizer9ed6 implements RateHypothesizer {
 	 * @param observedCounts A sequence of observed integer-valued quantities.
 	 */
 	@Override
-	public List<Double> apply(final List<Integer> observedCounts) {
+	public List<Double> apply(final List<Number> observedCounts) {
 		final List<Double> hyp = new ArrayList<>();
 
 		/*
 		 * Initialize the hypothesis
 		 */
-		for (final Integer i : observedCounts) {
+		for (final Number i : observedCounts) {
 			final Double d = i.doubleValue();
 			hyp.add(d);
 		}
@@ -56,7 +56,7 @@ public class RateHypothesizer9ed6 implements RateHypothesizer {
 	 * @param theta2         INPUT: Parameters of the objective function.
 	 * @return the objective function value.
 	 */
-	private double calcFG(final List<Integer> observedCounts, final List<Double> hyp, final List<Double> hyp_,
+	private double calcFG(final List<Number> observedCounts, final List<Double> hyp, final List<Double> hyp_,
 			final Map<String, Object> theta2) {
 		// TODO Auto-generated method stub
 		return 0;

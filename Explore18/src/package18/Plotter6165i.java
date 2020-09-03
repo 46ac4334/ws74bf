@@ -1432,6 +1432,8 @@ public class Plotter6165i extends JInternalFrame {
 
 	private final List<LegendItem> legendItems = new ArrayList<>();
 
+	public JMenuItem menuItemToggleLog;
+
 	private final JMenuItem menuItemZoomOff = new JMenuItem("Zoom OFF ✓");
 
 	private final JMenuItem menuItemZoomXandY = new JMenuItem("Zoom X and Y");
@@ -1990,8 +1992,8 @@ public class Plotter6165i extends JInternalFrame {
 		});
 		this.plotterPopupMenu.add(menuItemSave);
 
-		final JMenuItem menuItemToggleLog = new JMenuItem("Toggle semiLog");
-		menuItemToggleLog.addActionListener(e -> {
+		this.menuItemToggleLog = new JMenuItem("Toggle semiLog");
+		this.menuItemToggleLog.addActionListener(e -> {
 			Plotter6165i.this.semiLog = !Plotter6165i.this.semiLog;
 			this.pathBounds = this.plotterPane.logPath.getBounds2D();
 			Plotter6165i.this.zoomFullscale(this.semiLog ? this.plotterPane.logPath : this.plotterPane.path);
@@ -2000,7 +2002,7 @@ public class Plotter6165i extends JInternalFrame {
 			Plotter6165i.this.repaint();
 		});
 
-		this.plotterPopupMenu.add(menuItemToggleLog);
+		this.plotterPopupMenu.add(this.menuItemToggleLog);
 
 		this.buttonPane.setBackground(Color.getHSBColor(.436f, .35f, .7f));
 		final var label = new JLabel("Component Visibilities");

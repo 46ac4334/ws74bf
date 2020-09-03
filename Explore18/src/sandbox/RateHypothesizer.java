@@ -15,6 +15,6 @@ import java.util.function.Function;
  * @author bakis
  *
  */
-public interface RateHypothesizer extends Function<List<Integer>, List<Double>> {
+public interface RateHypothesizer extends Function<List<Number>, List<Double>> {
 
 }

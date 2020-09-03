@@ -63,9 +63,35 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		country, county, province, state
 	}
 
+	/**
+	 * Information about a geographic area. The area is defined by up to three names
+	 * of type {@link String}:
+	 * <dl>
+	 * <dt>Country/Region</dt>
+	 * <dd>Required. Generally the name of a country. Examples: US, Germany.</dd>
+	 * <dt>Province/State</dt>
+	 * <dd>Optional, but required if <code>Admin2</code> is specified. Examples: New
+	 * York, Baden-Wurttemberg.</dd>
+	 * <dt>Admin2</dt>
+	 * <dd>Currently only used to specify a county within a U.S. state. Examples:
+	 * Westchester, ‎Multnomah.</dd>
+	 * </dl>
+	 *
+	 * @author bakis
+	 *
+	 */
 	@SuppressWarnings("unused")
 	private class Area {
 
+		/**
+		 * The region key consists of three names of type {@link String}. Instances of
+		 * this type are comparable, with the <code>country_Region</code> being the
+		 * primary sort key, followed by <code>province_State</code> and then
+		 * <code>admin2</code>.
+		 *
+		 * @author bakis
+		 *
+		 */
 		private class Key implements Comparable<Key> {
 
 			/**
@@ -143,6 +169,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 */
 		private List<Long> recovered;
 
+		/**
+		 * @param r A CSVRecord containing the required data
+		 */
 		public Area(final CSVRecord r) {
 			final CSVParser parser = r.getParser();
 			final List<String> headerNames = parser.getHeaderNames();
@@ -164,7 +193,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			 * "recovered", but it doesn't know which unless it has the file name. But could
 			 * it have access to all the files? It effectively does because these are all
 			 * instance fields in the enclosing class. Still, it needs to know which file
-			 * the give record (argument to this constructor) came from.
+			 * the given record (argument to this constructor) came from.
 			 */
 
 			var firstDate = true;
@@ -454,7 +483,16 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 */
 		private final ControlPanel parentPanel;
 
+		private final long population;
+
 		private final JPopupMenu popup = new JPopupMenu();
+
+		private final String stateName;
+
+		public JButton2(final String text, final char charOn, final char charOff, final ControlPanel parent,
+				final ADMIN adm, final String stateName) {
+			this(text, charOn, charOff, parent, adm, stateName, 0);
+		}
 
 		/**
 		 * <p>
@@ -467,15 +505,19 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 * depending on whether this action turned the button on or off.
 		 * </p>
 		 *
-		 * @param text    Text to appear on the button
-		 * @param charOn  The prefix to the text indicating the button is selected
-		 * @param charOff The prefix to the text indicating the button is not selected
-		 * @param parent  The ControlPanel object on which this button appears.
-		 * @param adm     The type of the administrative region.
+		 * @param text       Text to appear on the button
+		 * @param charOn     The prefix to the text indicating the button is selected
+		 * @param charOff    The prefix to the text indicating the button is not
+		 *                   selected
+		 * @param parent     The ControlPanel object on which this button appears.
+		 * @param adm        The type of the administrative region.
+		 * @param population The population of the unit if available, otherwise 0.
 		 */
 		public JButton2(final String text, final char charOn, final char charOff, final ControlPanel parent,
-				final ADMIN adm) {
+				final ADMIN adm, final String stateName, final long population) {
 			super(text);
+			this.population = population;
+			this.stateName = stateName;
 			this.admin = adm;
 			this.setToolTipText(this.admin.toString());
 			this.parentPanel = parent;
@@ -489,9 +531,13 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			final var menuItem2 = new JMenuItem("Remove from pool");
 			menuItem2.addActionListener(e -> TrackCovid19.this.removeFromPool(JButton2.this));
 			this.popup.add(menuItem2);
-			final var menuItem3 = new JMenuItem("Analyze now");
+			final var menuItem3 = new JMenuItem("Show Chart");
 			menuItem3.addActionListener(e -> TrackCovid19.this.analyzeNow(JButton2.this));
 			this.popup.add(menuItem3);
+
+			if (population > 0) {
+				this.setToolTipText(String.format("pop. %,d", population));
+			}
 
 		}
 
@@ -508,6 +554,10 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 */
 		public ControlPanel getParentPanel() {
 			return this.parentPanel;
+		}
+
+		public String getStateName() {
+			return this.stateName;
 		}
 
 	}
@@ -939,8 +989,28 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	private void analyzeCounty(final JButton2 button) {
-		Toolkit.getDefaultToolkit().beep();
-		JOptionPane.showInternalMessageDialog(this.scrollPane, "County analysis not yet implemented.");
+		final var countyName = button.getText();
+		final String stateName = button.getStateName();
+		final List<Integer> cumulativeCounts = this.getCountsForCounty(countyName, stateName);
+		if (cumulativeCounts == null) {
+			System.out.format("counts are null for county %s%n", countyName);
+		}
+		if (cumulativeCounts.isEmpty()) {
+			System.out.format("counts are empty for county %s%n", countyName);
+		}
+
+		final Plotter6165i showPlot = this.showPlot(countyName + " county of " + stateName, cumulativeCounts);
+		showPlot.setCaptionText(String.format("population %,d", button.population));
+		showPlot.pack();
+		showPlot.setVisible(true);
+//		showPlot.menuItemToggleLog.doClick();
+
+//		showPlot.getPlotterPane().    setSemiLog(false);
+
+		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(
+				countyName + " county of " + stateName + ", per 100K", cumulativeCounts, button.population * 1e-5);
+		showNormalizedPlot.setCaptionText(String.format("per 100K. Population %,d", button.population));
+		return;
 	}
 
 	public Object analyzeNow(final JButton2 button) {
@@ -979,7 +1049,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		if (cumulativeCounts.isEmpty()) {
 			System.out.format("counts are empty for state %s%n", stateName);
 		}
-		this.showPlot(stateName, cumulativeCounts);
+		this.showPlot(String.format("%s (pop. %,d)", stateName, button.population), cumulativeCounts);
 		return;
 
 	}
@@ -1285,7 +1355,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		for (final CSVRecord r : this.confirmedGlobalRecords) {
 			final var string = r.get(integer);
 			if (string.equalsIgnoreCase(countryName)) {
-
 				for (final String dateHeader : this.dateHeaderList) {
 					final var count = r.get(dateHeader);
 					result.add(Integer.parseInt(count));
@@ -1295,6 +1364,42 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			}
 		}
 		return result;
+	}
+
+	private List<Integer> getCountsForCounty(final String countyName, final String stateName) {
+		final Integer stateColumnIndex = this.confirmedUSheaderMap.get("Province_State");
+		final Integer countyColumnIndex = this.confirmedUSheaderMap.get("Admin2");
+		final List<Integer> dailyCounts = new ArrayList<>();
+
+		final Map<Date, Integer> dateCountMap = new TreeMap<>();
+
+		for (final CSVRecord record : this.confirmedUSRecords) {
+			// search through all US records. Pick the ones for the requested state and
+			// county
+			final var string = record.get(stateColumnIndex);
+			final var string2 = record.get(countyColumnIndex);
+			if (string.equalsIgnoreCase(stateName) && string2.equalsIgnoreCase(countyName)) {// If this record is for
+																								// the requested county
+																								// in the requested
+																								// state:
+				// sum over all such counties.
+				for (final String dateHeader : this.dateHeaderList) {// iterate through all date column headers
+					final var dailyCountForCounty = Integer.parseInt(record.get(dateHeader));
+					final var date = this.headerDateMap.get(dateHeader);
+					final Integer sum = dateCountMap.containsKey(date) ? dateCountMap.get(date) : 0;
+					final var newSum = sum + dailyCountForCounty;
+					dateCountMap.put(date, newSum);
+				}
+			}
+		}
+
+		// Copy sums from dateCountMap to dailyCounts
+		for (final Date key : dateCountMap.keySet()) {
+			final var count = dateCountMap.get(key);
+			dailyCounts.add(count);
+		}
+
+		return dailyCounts;
 	}
 
 	private List<Integer> getCountsForState(final String stateName) {
@@ -1409,7 +1514,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param name Name of region
 	 * @return population of region
 	 */
-	long getPopulation(final String name) {// TODO not done
+	long getPopulation(final String name) {//
 		/*
 		 * Compile a list of all entities mentioned
 		 */
@@ -1456,6 +1561,63 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	/**
+	 * Calculates the population of the county by summing all entries in the lookup
+	 * table file that have the specified state name in the
+	 * <code>Province_State</code> column, the county name in the
+	 * <code>Admin2</code> column, and "US" in the <code>Country_Region</code>
+	 * column.
+	 *
+	 * @param stateName  The name of a state of the United States of America.
+	 * @param countyName The name of a county within the specified state.
+	 * @return The population of the specified county in the specified state
+	 *         obtained from lookup table file.
+	 */
+	final long getPopulationOfCounty(final String stateName, final String countyName) {
+		final int provinceStateIndex = this.lookupheaderMap.get("Province_State");
+		final int admin2Index = this.lookupheaderMap.get("Admin2");
+		final int countryRegionIndex = this.lookupheaderMap.get("Country_Region");
+		final int populationIndex = this.lookupheaderMap.get("Population");
+		int population = 0;
+		for (final CSVRecord record : this.lookupRecords) {
+			if (stateName.equalsIgnoreCase(record.get(provinceStateIndex))
+					&& countyName.equalsIgnoreCase(record.get(admin2Index))
+					&& "US".equals(record.get(countryRegionIndex))) {
+				final String populationString = record.get(populationIndex);
+				population += populationString == null || populationString.isBlank() ? 0
+						: Integer.parseInt(populationString);
+			}
+		}
+		return population;
+	}
+
+	/**
+	 * Calculates the population of the state by summing all entries in the lookup
+	 * table file that have the specified state name in the
+	 * <code>Province_State</code> column, "US" in the Country_Region column and a
+	 * blank in the <code>Admin2</code> column.
+	 *
+	 * @param stateName The name of a state of the United States of America.
+	 * @return The population of the specified state obtained from lookup table
+	 *         file.
+	 */
+	final long getPopulationOfState(final String stateName) {
+		final int provinceStateIndex = this.lookupheaderMap.get("Province_State");
+		final int admin2Index = this.lookupheaderMap.get("Admin2");
+		final int countryRegionIndex = this.lookupheaderMap.get("Country_Region");
+		final int populationIndex = this.lookupheaderMap.get("Population");
+		int population = 0;
+		for (final CSVRecord record : this.lookupRecords) {
+			if (stateName.equalsIgnoreCase(record.get(provinceStateIndex)) && record.get(admin2Index).isBlank()
+					&& "US".equals(record.get(countryRegionIndex))) {
+				final String populationString = record.get(populationIndex);
+				population += populationString == null || populationString.isBlank() ? 0
+						: Integer.parseInt(populationString);
+			}
+		}
+		return population;
+	}
+
+	/**
 	 * @param headerMap
 	 * @param records
 	 * @return Map in which the key is a country name and the value is a set of row
@@ -1483,9 +1645,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * @param dailyCounts
 	 * @return
 	 */
-	private List<Double> hypothesize(final List<Integer> dailyCounts) {
+	private List<Double> hypothesize(final List<Number> dailyCounts) {
 		final var sevenDayAverage = new SevenDayAverage();
-		final var result = sevenDayAverage.apply(dailyCounts);
+		final List<Double> result = sevenDayAverage.apply(dailyCounts);
 		return result;
 	}
 
@@ -1593,7 +1755,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 		this.countryNames = this.getCountryNames(this.confirmedGlobalheaderMap, this.confirmedGlobalRecords);
 		for (final String country : this.countryNames.keySet()) {
-			countryButtonsPanel.add(new JButton2(country, '+', '-', countryButtons, ADMIN.country));
+			countryButtonsPanel.add(new JButton2(country, '+', '-', countryButtons, ADMIN.country, null));
 		}
 
 		this.stateNames = this.getStateNames(this.confirmedUSheaderMap, this.confirmedUSRecords);
@@ -1640,8 +1802,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 		final Long index = iterator.next() - 1;
 		final var csvRecord = records.get(index.intValue());
-		final var countryName = csvRecord.get("Province_State");
+		final var stateName = csvRecord.get("Province_State");
 		final var title = "Counties of " + parent.getText();
+		final String state_Name = parent.getText();
 		countyButtons.setTitle(title);
 		final var countyButtonsPanel = new JPanel();
 		countyButtonsPanel.setLayout(new FlowLayout());
@@ -1650,16 +1813,19 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		label.setFont(label.getFont().deriveFont(30f));
 		label.setHorizontalAlignment(SwingConstants.CENTER);
 		countyButtonsPanel.add(label);
-		final var provinceName = csvRecord.get("Admin2");
-		final var name1a = provinceName.isEmpty() ? countryName : provinceName;
-		countyButtonsPanel.add(new JButton2(name1a, '2', '3', countyButtons, ADMIN.county));
+		final var countyName = csvRecord.get("Admin2");
+		final var name1a = countyName.isEmpty() ? stateName : countyName;
+		final long population = this.getPopulationOfCounty(stateName, countyName);
+		countyButtonsPanel.add(new JButton2(name1a, '2', '3', countyButtons, ADMIN.county, state_Name, population));
 		countyButtons.setContentPane(countyButtonsPanel);
 		while (iterator.hasNext()) {
 			final var recordIndex1 = iterator.next().intValue() - 1;
 			final var csvRecord2 = records.get(recordIndex1);
 			final var name1 = csvRecord2.get("Admin2");
-			final var name1b = name1.isEmpty() ? countryName : name1;
-			countyButtonsPanel.add(new JButton2(name1b, '2', '3', countyButtons, ADMIN.county));
+			final var name1b = name1.isEmpty() ? stateName : name1;
+			final long population2 = this.getPopulationOfCounty(stateName, name1);
+			countyButtonsPanel
+					.add(new JButton2(name1b, '2', '3', countyButtons, ADMIN.county, state_Name, population2));
 		}
 		countyButtons.pack();
 		countyButtons.setVisible(true);
@@ -1667,13 +1833,13 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		return countyButtons;
 	}
 
-	/**
-	 * @param name             The title to appear on the plot
-	 * @param cumulativeCounts The values to be plotted
-	 */
-	private void showPlot(final String name, final List<Integer> cumulativeCounts) {
+	@SuppressWarnings("unused")
+	private Plotter6165i showNormalizedPlot(final String name, final List<Integer> cumulativeCounts,
+			final double norm) {
 		final var cumulCountsIterator = cumulativeCounts.iterator();
 		final var plotter = new Plotter6165i();
+
+		plotter.setCaptionText("");
 		plotter.setIconifiable(true);
 		plotter.setPreferredSize(this.defaultPlotterSize);
 		this.desktop.add(plotter);
@@ -1686,7 +1852,61 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		hypoPath.moveTo(0, 0);
 		var i = 0;
 		Integer oldCumul = 0;
-		final List<Integer> dailyCounts = new ArrayList<>();
+		final List<Number> dailyCounts = new ArrayList<>();
+		while (cumulCountsIterator.hasNext()) {
+			final var cumulCount = cumulCountsIterator.next();
+			final var dailyCount = cumulCount - oldCumul;
+			dailyCounts.add(dailyCount);
+			cumulPath.lineTo(i, cumulCount / norm);
+			dailyPath.lineTo(i, dailyCount / norm);
+			oldCumul = cumulCount;
+			++i;
+		}
+		final var hypothesizedRates = this.hypothesize(dailyCounts);
+		final var iterator = hypothesizedRates.iterator();
+		i = 0;
+		while (iterator.hasNext()) {
+			final double hypoRate = iterator.next();
+			hypoPath.lineTo(i, hypoRate / norm);
+			++i;
+		}
+//		plotter.setMainPlotPath(cumulPath);
+//		plotter.addPlotPath(Color.red.darker(), dailyPath, new BasicStroke(1));
+//		plotter.addPlotPath(Color.green.darker(), hypoPath, new BasicStroke(1.5f));
+		plotter.setSemiLog(true);
+		plotter.setMainPlotPath(hypoPath);
+		plotter.setIconifiable(true);
+		plotter.setPlotTitle(name);
+		plotter.setTitle(name);
+		plotter.pack();
+		plotter.setVisible(true);
+		this.arrangeWindows();
+
+		return plotter;
+	}
+
+	/**
+	 * @param name             The title to appear on the plot
+	 * @param cumulativeCounts The values to be plotted
+	 * @return
+	 */
+	private Plotter6165i showPlot(final String name, final List<Integer> cumulativeCounts) {
+		final var cumulCountsIterator = cumulativeCounts.iterator();
+		final var plotter = new Plotter6165i();
+		plotter.setCaptionText("");
+		plotter.setIconifiable(true);
+		plotter.setPreferredSize(this.defaultPlotterSize);
+		this.desktop.add(plotter);
+		plotter.setXDateOrigin(this.firstDateMillis);
+		final var cumulPath = new java.awt.geom.Path2D.Double();
+		cumulPath.moveTo(0, 0);
+		final var dailyPath = new java.awt.geom.Path2D.Double();
+		dailyPath.moveTo(0, 0);
+		final var hypoPath = new Path2D.Double();
+		hypoPath.moveTo(0, 0);
+		var i = 0;
+		Integer oldCumul = 0;
+		final List<Number> dailyCounts = new ArrayList<>();
 		while (cumulCountsIterator.hasNext()) {
 			final var cumulCount = cumulCountsIterator.next();
 			final var dailyCount = cumulCount - oldCumul;
@@ -1715,6 +1935,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		plotter.pack();
 		plotter.setVisible(true);
 		this.arrangeWindows();
+		return plotter;
 	}
 
 	private ControlPanel showPool() {
@@ -1798,14 +2019,14 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		provinceButtonsPanel.add(label);
 		final var provinceName = csvRecord.get("Province/State");
 		final var name1a = provinceName.isEmpty() ? countryName : provinceName;
-		provinceButtonsPanel.add(new JButton2(name1a, '4', '5', provinceButtons, ADMIN.province));
+		provinceButtonsPanel.add(new JButton2(name1a, '4', '5', provinceButtons, ADMIN.province, provinceName));
 		provinceButtons.setContentPane(provinceButtonsPanel);
 		while (iterator.hasNext()) {
 			final var recordIndex1 = iterator.next().intValue() - 1;
 			final var csvRecord2 = records.get(recordIndex1);
 			final var name1 = csvRecord2.get("Province/State");
 			final var name1b = name1.isEmpty() ? countryName : name1;
-			provinceButtonsPanel.add(new JButton2(name1b, '4', '5', provinceButtons, ADMIN.province));
+			provinceButtonsPanel.add(new JButton2(name1b, '4', '5', provinceButtons, ADMIN.province, provinceName));
 		}
 		provinceButtons.pack();
 		provinceButtons.setVisible(true);
@@ -1845,7 +2066,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		while (iterator.hasNext()) {
 			final var stateName = iterator.next();
 			final var name1a = stateName.isEmpty() ? countryName : stateName;
-			stateButtonsPanel.add(new JButton2(name1a, '0', '1', stateButtons, ADMIN.state));
+			stateButtonsPanel.add(new JButton2(name1a, '0', '1', stateButtons, ADMIN.state, stateName,
+					this.getPopulationOfState(stateName)));
 		}
 
 		stateButtons.pack();
