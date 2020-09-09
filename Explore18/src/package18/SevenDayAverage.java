@@ -3,8 +3,6 @@
  */
 package package18;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -26,7 +24,8 @@ public class SevenDayAverage implements RateHypothesizer {
 		CYCLE,
 
 		/**
-		 * Pad at the end with the average of the last seven (or all) values.
+		 * Pad at the end with the average of the last seven (or all, if series is
+		 * shorter than 7) values.
 		 */
 		LAST_AVERAGE,
 
@@ -46,73 +45,6 @@ public class SevenDayAverage implements RateHypothesizer {
 		ZERO
 	}
 
-	public class ShiftRegister extends ArrayList<Number> {
-		private static final long serialVersionUID = 1L;
-		private int count = 0;
-		private final int limit;
-		private double sum = 0;
-
-		public ShiftRegister(final int limit) {
-			super(limit);
-			this.limit = limit;
-			if (SevenDayAverage.this.debug) {
-				System.out.println(StaticMethods.stacktrace(
-						String.format("%s instantiated, with limit = %,d.%n", this.getClass().getSimpleName(), limit)));
-			}
-		}
-
-		/**
-		 * @return the count
-		 */
-		public int getCount() {
-			return this.count;
-		}
-
-		/**
-		 * @return the sum
-		 */
-		public double getSum() {
-			return this.sum;
-		}
-
-		public void push(final Number x) {
-			this.add(0, x);
-			final double doubleValue = x.doubleValue();
-			if (Double.isFinite(doubleValue)) {
-				++this.count;
-				this.sum += doubleValue;
-			}
-
-			while (this.size() > this.limit) {
-				final double doubleValue2 = this.remove(this.size() - 1).doubleValue();
-				if (Double.isFinite(doubleValue2)) {
-					this.sum -= doubleValue2;
-				}
-			}
-
-		}
-
-		/**
-		 * @param sum the sum to set
-		 */
-		public void setSum(final double sum) {
-			this.sum = sum;
-		}
-
-		@Override
-		public String toString() {
-			final StringWriter sw = new StringWriter();
-			final PrintWriter out = new PrintWriter(sw);
-			out.format("count = %,d%n", this.count);
-			out.format("limit = %,d%n", this.limit);
-			out.format(" size = %,d%n", this.size());
-			out.format("%s%n", super.toString());
-			out.close();
-			return sw.toString();
-		}
-
-	}
-
 	public enum StartPad {
 
 		/**
@@ -121,7 +53,8 @@ public class SevenDayAverage implements RateHypothesizer {
 		CYCLE,
 
 		/**
-		 * Pad at the start with the average of the first seven (or all) values.
+		 * Pad at the start with the average of the first seven (or all, if series is
+		 * shorter than 7) values.
 		 */
 		FIRST_AVERAGE,
 
@@ -172,30 +105,47 @@ public class SevenDayAverage implements RateHypothesizer {
 		this.endPad = endPad;
 	}
 
+	/**
+	 * @param source the list of values which are to be averaged
+	 * @return A list of values of the same length as the input list, but each value
+	 *         representing the average of seven input values: three before the
+	 *         current one, the current input value, and three succeeding values.
+	 *         The three values each before the start and after the end of the input
+	 *         list are computed according to the given <code>StartPad</code> and
+	 *         <code>EndPad</code> specifications.
+	 */
 	@Override
 	public List<Double> apply(final List<Number> source) {
 
-		final List<Double> result = source == null ? null : new ArrayList<>();
+		if (source == null) {
+			return null;
+		}
 
-		double startPadValue = Double.NaN;
+		final List<Double> result = new ArrayList<>();
+
 		final double[] startPadValues = new double[3];
-		Arrays.fill(startPadValues, Double.NaN);
+		Arrays.fill(startPadValues, Double.NaN);// Default to NaN if subsequent code fails to specify anything else.
 		if (this.debug) {
 			System.out.format("debugging%n");
 			System.out.println("source =" + source.toString());
 			System.out.println(StaticMethods.stacktrace(String.format("startPad = %s", this.startPad.toString())));
 		}
 
-		switch (this.startPad) {// Get the padding value for the first three days:
+		switch (this.startPad) {// Get the padding value for the three days preceding the given series:
 		case CYCLE:
 			final Iterator<Number> startPadIterator = source.iterator();
-			int i = -3;
-			while (startPadIterator.hasNext() && i < 7) {
-				if (i >= 0 && i < 3 && i < startPadValues.length) {
-					startPadValues[i] = startPadIterator.next().doubleValue();
-				}
-				++i;
+//			int i = -3;
+//			while (startPadIterator.hasNext() && i < 7) {
+//				if (i >= 0 && i < 3 && i < startPadValues.length) {
+//					startPadValues[i] = startPadIterator.next().doubleValue();
+//				}
+//				++i;
+//			}
+
+			for (int i = 0; i < 3; ++i) {
+
 			}
+
 			break;
 		case FIRST_AVERAGE:
 			startPadValue = this.getFirstAverage(source, 3);
