@@ -40,6 +40,11 @@ public class SevenDayAverage implements RateHypothesizer {
 		NAN,
 
 		/**
+		 * Symmetric around current point
+		 */
+		SYMM,
+
+		/**
 		 * Pad at the end with zeros
 		 */
 		ZERO
@@ -125,36 +130,39 @@ public class SevenDayAverage implements RateHypothesizer {
 
 		final double[] startPadValues = new double[3];
 		Arrays.fill(startPadValues, Double.NaN);// Default to NaN if subsequent code fails to specify anything else.
+		double[] endPadValues = new double[3];
+		Arrays.fill(endPadValues, Double.NaN);// Default to NaN if subsequent code fails to specify anything else.
 		if (this.debug) {
 			System.out.format("debugging%n");
 			System.out.println("source =" + source.toString());
 			System.out.println(StaticMethods.stacktrace(String.format("startPad = %s", this.startPad.toString())));
 		}
 
+		Double startPadValue = null;
 		switch (this.startPad) {// Get the padding value for the three days preceding the given series:
 		case CYCLE:
 			final Iterator<Number> startPadIterator = source.iterator();
-//			int i = -3;
-//			while (startPadIterator.hasNext() && i < 7) {
-//				if (i >= 0 && i < 3 && i < startPadValues.length) {
-//					startPadValues[i] = startPadIterator.next().doubleValue();
-//				}
-//				++i;
-//			}
-
-			for (int i = 0; i < 3; ++i) {
-
+			int i = -3;
+			while (i < 4) {
+				final double d = startPadIterator.hasNext() ? startPadIterator.next().doubleValue() : Double.NaN;
+				if (i > 0 && i <= startPadValues.length) {
+					startPadValues[i - 1] = d;
+				}
+				++i;
 			}
-
+			System.out.println("** " + StaticMethods.simpleVectorPrint(startPadValues));
+			startPadValue = null;
 			break;
 		case FIRST_AVERAGE:
-			startPadValue = this.getFirstAverage(source, 3);
+			startPadValue = this.getFirstAverage(source, 7);
 			break;
 		case FIRST_VALUE:
 			startPadValue = this.getFirstAverage(source, 1);
 			break;
+		case NAN:
+			break;
 		case ZERO:
-			startPadValue = 0;
+			startPadValue = 0.;
 			break;
 		default:
 			startPadValue = Double.NaN;
@@ -164,19 +172,38 @@ public class SevenDayAverage implements RateHypothesizer {
 			System.out.println(StaticMethods.stacktrace(String.format("startPadValue = %.3g", startPadValue)));
 		}
 
-		double endPadValue = Double.NaN;
+		Double endPadValue = Double.NaN;
 		if (this.debug) {
 			System.out.println(StaticMethods.stacktrace(String.format("endPad = %s", this.endPad.toString())));
 		}
 		switch (this.endPad) {// Get the padding value for the last three days:
+		case CYCLE:
+			endPadValue = null;
+			final ListIterator<Number> sourceListIterator = source.listIterator(source.size());
+			for (int i = 0; i < 4; ++i) {// Skip the last 4 elements of source
+				if (sourceListIterator.hasPrevious()) {
+					sourceListIterator.previous();
+				}
+			}
+			for (int i = 3; i > 0; --i) {// Get the three source values from the start of the last 7.
+				endPadValues[i - 1] = sourceListIterator.hasPrevious() ? sourceListIterator.previous().doubleValue()
+						: Double.NaN;
+			}
+			break;
 		case LAST_AVERAGE:
-			endPadValue = this.getLastAverage(source, 3);
+			endPadValue = this.getLastAverage(source, 7);
 			break;
 		case LAST_VALUE:
 			endPadValue = this.getLastAverage(source, 1);
 			break;
+		case NAN:
+			break;
+		case SYMM:
+			endPadValue = null;
+			endPadValues = null;
+			break;
 		case ZERO:
-			endPadValue = 0;
+			endPadValue = 0.;
 			break;
 		default:
 			endPadValue = Double.NaN;
@@ -188,6 +215,7 @@ public class SevenDayAverage implements RateHypothesizer {
 
 		final var iterator = source.iterator();
 		final ShiftRegister shiftReg = new ShiftRegister(7);
+
 		if (this.debug) {
 			System.out.format("shiftReg: %s", shiftReg.toString());
 		}
@@ -196,7 +224,7 @@ public class SevenDayAverage implements RateHypothesizer {
 		 * prime the shift register with startPadValue
 		 */
 		for (int i = 0; i < 3; ++i) {
-			shiftReg.push(startPadValue);
+			shiftReg.push(startPadValue == null ? startPadValues[i] : startPadValue);
 		}
 		int j = -3;
 		while (iterator.hasNext()) {
@@ -209,9 +237,11 @@ public class SevenDayAverage implements RateHypothesizer {
 				System.out.format("push %.3g, j=%,d, sum=%.3g %s%n", doubleValue, j, shiftReg.getSum(),
 						((List<Number>) shiftReg).toString());
 			}
-			System.out.format("shiftReg:%n%s%n", shiftReg.toString());
+			if (this.debug) {
+				System.out.format("shiftReg:%n%s%n", shiftReg.toString());
+			}
 			if (j >= 0) {
-				result.add(shiftReg.getSum() / 7.);
+				result.add(shiftReg.getMean());
 			}
 			if (this.debug) {
 				System.out.format("result: %s%n", result);
@@ -219,32 +249,32 @@ public class SevenDayAverage implements RateHypothesizer {
 			++j;
 		}
 
+		int i = 0;
 		while (result.size() < source.size()) {
-			shiftReg.push(endPadValue);
-			result.add(shiftReg.getSum() / 7.);
+			if (endPadValue == null) {
+				if (endPadValues == null) {
+					for (int i1 = 0; i1 < 2; ++i1) {
+						shiftReg.push(Double.NaN);
+					}
+				} else {
+					shiftReg.push(endPadValues[i]);
+				}
+				result.add(shiftReg.getMean());
+			} else {
+				shiftReg.push(endPadValue);
+				result.add(shiftReg.getMean());
+			}
+			++i;
 		}
 
-//		for (var i = 0; i < 3; ++i) {
-//
-//			sum += next;
-//			shiftReg.add(0, next);
-//
-//			while (shiftReg.size() > 7) {
-//				sum -= shiftReg.remove(7);
-//			}
-//			result.add(sum / 7.);
-//		}
-//		if (result.size() > 0) {
-//			result.remove(0);
-//		}
-//		if (result.size() > 0) {
-//			result.remove(0);
-//		}
-//		if (result.size() > 0) {
-//			result.remove(0);
-//		}
-
 		return result;
+	}
+
+	/**
+	 * @return the endPad
+	 */
+	public EndPad getEndPad() {
+		return this.endPad;
 	}
 
 	/**
@@ -287,6 +317,13 @@ public class SevenDayAverage implements RateHypothesizer {
 			endPadValue = Double.NaN;
 		}
 		return endPadValue;
+	}
+
+	/**
+	 * @return the startPad
+	 */
+	public StartPad getStartPad() {
+		return this.startPad;
 	}
 
 	/**

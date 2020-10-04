@@ -16,22 +16,10 @@ public class ShiftRegister extends ArrayList<Number> {
 	private static final long serialVersionUID = 1L;
 
 	/**
-	 * Total count of non-<code>NaN</code> elements processed so far. This can be
-	 * larger than the current length of the array, because as new elements are
-	 * added to the array, old elements are shifted out to keep the length of the
-	 * array no greater than {@link #limit}. Use {@link #size()} to get the current
-	 * length of the array.
-	 *
-	 * @see #grandCount
-	 *
-	 */
-	private int count = 0;
-
-	/**
 	 * The total number of elements pushed to this array, including <code>NaN</code>
 	 * values.
 	 *
-	 * @see #count
+	 * @see #processedCount
 	 */
 	private int grandCount = 0;
 
@@ -53,6 +41,18 @@ public class ShiftRegister extends ArrayList<Number> {
 	private int n;
 
 	/**
+	 * Total count of non-<code>NaN</code> elements processed so far. This can be
+	 * larger than the current length of the array, because as new elements are
+	 * added to the array, old elements are shifted out to keep the length of the
+	 * array no greater than {@link #limit}. Use {@link #size()} to get the current
+	 * length of the array.
+	 *
+	 * @see #grandCount
+	 *
+	 */
+	private int processedCount = 0;
+
+	/**
 	 * Sum of the current elements present in this array. Elements with value
 	 * <code>NaN</code> are considered missing and are ignored in the computation of
 	 * this sum.
@@ -65,7 +65,7 @@ public class ShiftRegister extends ArrayList<Number> {
 	 * @param limit The maximum length of this array.
 	 */
 	public ShiftRegister(final int limit) {
-		super(limit);
+		super(limit + 1);
 		this.limit = limit;
 	}
 
@@ -78,17 +78,14 @@ public class ShiftRegister extends ArrayList<Number> {
 	 * @return the count
 	 */
 	public int getCount() {
-		return this.count;
+		return this.processedCount;
 	}
 
-	
-	
 	/**
 	 * Get he total count of elements pushed to this array, including
 	 * <code>NaN</code> values, and including values that have already been shifted
 	 * out.
 	 *
-	 * @see {@link #getCount()}
 	 *
 	 * @return the grandCount
 	 */
@@ -141,7 +138,7 @@ public class ShiftRegister extends ArrayList<Number> {
 		final double doubleValue = x.doubleValue();
 		++this.grandCount;
 		if (!Double.isNaN(doubleValue)) {
-			++this.count;
+			++this.processedCount;
 		}
 
 		while (this.size() > this.limit) {
@@ -149,10 +146,10 @@ public class ShiftRegister extends ArrayList<Number> {
 		}
 
 		this.sum = 0;
+		this.n = 0;
 		final Iterator<Number> iterator = this.iterator();
 		while (iterator.hasNext()) {
 			final double doubleValue2 = iterator.next().doubleValue();
-			this.n = 0;
 			if (!Double.isNaN(doubleValue2)) {
 				this.sum += doubleValue2;
 				++this.n;
@@ -166,10 +163,13 @@ public class ShiftRegister extends ArrayList<Number> {
 	public String toString() {
 		final StringWriter sw = new StringWriter();
 		final PrintWriter out = new PrintWriter(sw);
-		out.format("count = %,d%n", this.count);
-		out.format("limit = %,d%n", this.limit);
-		out.format(" size = %,d%n", this.size());
-		out.format("  sum = %,d%n", this.sum);
+		out.format("%15s = %,d%n", "processedCount", this.processedCount);
+		out.format("%15s = %,d%n", "grandCount", this.grandCount);
+		out.format("%15s = %,d%n", "limit", this.limit);
+		out.format("%15s = %.3g%n", "mean", this.mean);
+		out.format("%15s = %,d%n", "n", this.n);
+		out.format("%15s = %,d%n", "size", this.size());
+		out.format("%15s = %.3g%n", "sum", this.sum);
 		out.format("%s%n", super.toString());
 		out.close();
 		return sw.toString();

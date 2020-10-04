@@ -414,7 +414,7 @@ public class Plotter6165i extends JInternalFrame {
 					+ stringBounds.getCenterX();
 			final double centerX = stringBounds.getHeight();
 			g.rotate(-Math.PI / 2, centerX, centerY);
-			g.setColor(Color.BLACK);
+//			g.setColor(Color.BLACK);
 			g.drawString(text2, (float) centerX, (float) centerY);
 			g.rotate(Math.PI / 2, centerX, centerY);
 			g.setColor(oldColor);
@@ -805,6 +805,7 @@ public class Plotter6165i extends JInternalFrame {
 					g.setColor(oldColor);
 					g.setClip(this.boundingBox);
 
+					// only!
 					g.draw(transformedXGrid);
 
 					g.draw(transformedYGrid);
@@ -905,7 +906,12 @@ public class Plotter6165i extends JInternalFrame {
 				}
 				Plotter6165i.this.yAxisLabelText = (Plotter6165i.this.semiLog ? "Logarithmic" : "Linear") + " Scale";
 				if (Plotter6165i.this.yAxisLabelText != null && !Plotter6165i.this.yAxisLabelText.isEmpty()) {
+					final Color yAxisLabelColor = Plotter6165i.this.semiLog ? Plotter6165i.this.yAxisLabelSemilogColor
+							: Plotter6165i.this.yAxisLabelLinearColor;
+					final Color oldColor = g.getColor();
+					g.setColor(yAxisLabelColor);
 					this.drawTheYAxisLabel(g, Plotter6165i.this.yAxisLabelText);
+					g.setColor(oldColor);
 				}
 
 				for (final LegendItem li : Plotter6165i.this.legendItems) {
@@ -1462,6 +1468,8 @@ public class Plotter6165i extends JInternalFrame {
 	 */
 	private int right = 20;
 
+	private Rectangle2D roundBounds;
+
 	private boolean semiLog = false;
 
 	private boolean showCaption = true;
@@ -1493,7 +1501,13 @@ public class Plotter6165i extends JInternalFrame {
 
 	private double[] xTicks2;
 
+//	private int[] xRoundRange;
+
 	private double[] xTicks3;
+
+	public Color yAxisLabelLinearColor = Color.BLACK;
+
+	public Color yAxisLabelSemilogColor = Color.RED.darker();
 
 	public String yAxisLabelText;
 
@@ -1678,13 +1692,7 @@ public class Plotter6165i extends JInternalFrame {
 		}
 		try {
 
-			/*
-			 * Each RoundRange array contains three elements. The last is log10 of the
-			 * interval between consecutive tick marks, for example -1 if the tick marks are
-			 * 0.1 units apart. The others are the beginning and end of the range in terms
-			 * of multiples of that interval.
-			 */
-			final var xRoundRange = Plotter6165i.getRoundRange(gridBounds.getX(),
+			final int[] xRoundRange = Plotter6165i.getRoundRange(gridBounds.getX(),
 					gridBounds.getX() + gridBounds.getWidth());
 			final var yRoundRange = Plotter6165i.getRoundRange(gridBounds.getY(),
 					gridBounds.getY() + gridBounds.getHeight());
@@ -1699,16 +1707,16 @@ public class Plotter6165i extends JInternalFrame {
 				System.out.println(String.format("81930de2 x = %.5g, y = %.5g, w = %.5g, h = %.5g", x, y, w, h));
 			}
 
-			final Rectangle2D roundBounds = new Rectangle2D.Double(x, y, w, h);
+			this.roundBounds = new Rectangle2D.Double(x, y, w, h);
 			if (Plotter6165i.roundrangeDebug) {
-				System.out.println(String.format("81930de4 roundBounds = %s", roundBounds.toString()));
+				System.out.println(String.format("81930de4 roundBounds = %s", this.roundBounds.toString()));
 			}
 
 			if (!zooming || this.pathToUnitBoxTransform == null) {
-				this.pathToUnitBoxTransform = AffineTransform.getScaleInstance(1. / roundBounds.getWidth(),
-						1. / roundBounds.getHeight());
-				this.pathToUnitBoxTransform
-						.concatenate(AffineTransform.getTranslateInstance(-roundBounds.getX(), -roundBounds.getY()));
+				this.pathToUnitBoxTransform = AffineTransform.getScaleInstance(1. / this.roundBounds.getWidth(),
+						1. / this.roundBounds.getHeight());
+				this.pathToUnitBoxTransform.concatenate(
+						AffineTransform.getTranslateInstance(-this.roundBounds.getX(), -this.roundBounds.getY()));
 			}
 			if (Plotter6165i.roundrangeDebug) {
 				System.out.println(
@@ -1935,6 +1943,13 @@ public class Plotter6165i extends JInternalFrame {
 	 */
 	public int getRight() {
 		return this.right;
+	}
+
+	/**
+	 * @return the roundBounds
+	 */
+	public Rectangle2D getRoundBounds() {
+		return this.roundBounds;
 	}
 
 	/**
@@ -2360,12 +2375,28 @@ public class Plotter6165i extends JInternalFrame {
 
 	protected void zoomFullscale(final Shape path) {
 		final Rectangle2D bounds2d = path.getBounds2D();
+		this.zoomToBounds(bounds2d);
+	}
+
+	/**
+	 * @param bounds2d
+	 */
+	private void zoomToBounds(final Rectangle2D bounds2d) {
 		this.pathToUnitBoxTransform = AffineTransform.getScaleInstance(1. / bounds2d.getWidth(),
 				1. / bounds2d.getHeight());
 		this.pathToUnitBoxTransform
 				.concatenate(AffineTransform.getTranslateInstance(-bounds2d.getX(), -bounds2d.getY()));
 		this.plotterPane.resetZoom();
 		this.repaint();
+	}
+
+	protected void zoomToYrange(final double yLow, final double yHigh) {
+		final Rectangle2D roundBounds2 = this.getRoundBounds();
+		final Rectangle2D bounds2d = new Rectangle2D.Double(roundBounds2.getX(), roundBounds2.getX(),
+				roundBounds2.getWidth(), yHigh - yLow);
+		this.zoomToBounds(bounds2d);
+		this.createGrid(bounds2d, true);
+
 	}
 
 }
