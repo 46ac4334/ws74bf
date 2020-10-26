@@ -406,6 +406,85 @@ public class Plotter6165i extends JInternalFrame {
 		public void componentShown(final ComponentEvent e) {
 		}
 
+		/**
+		 * @param g
+		 * @param transformedXGrid
+		 * @param transformedXGrid2
+		 * @param transformedXGrid3
+		 * @param transformedYGrid
+		 * @param transformedYGrid2
+		 * @param transformedYGrid3
+		 */
+		private void drawGrids(final Graphics2D g, final Shape transformedXGrid, final Shape transformedXGrid2,
+				final Shape transformedXGrid3, final Shape transformedYGrid, final Shape transformedYGrid2,
+				final Shape transformedYGrid3) {
+			final Color oldColor = g.getColor();
+			final Stroke oldStroke = g.getStroke();
+			final Shape oldClip = g.getClip();
+
+			g.setColor(this.majorGridColor);
+			g.setClip(this.boundingBox);
+
+			g.setStroke(this.boxStroke);
+			g.draw(transformedXGrid);
+			g.draw(transformedYGrid);
+
+			g.setStroke(this.stroke3);
+			g.draw(transformedXGrid3);
+			g.draw(transformedYGrid3);
+
+			g.setStroke(this.stroke2);
+			g.draw(transformedXGrid2);
+			g.draw(transformedYGrid2);
+
+			g.setColor(oldColor);
+			g.setStroke(oldStroke);
+			g.setClip(oldClip);
+		}
+
+		/**
+		 * @param g
+		 * @param mainPlotPath
+		 */
+		private void drawMainPlotPath(final Graphics2D g, final Shape mainPlotPath) {
+			g.setStroke(this.plotStroke);
+			g.setColor(this.plotColor);
+			if (mainPlotPath != null) {
+
+				if (this.showMainPlotPath) {
+					g.draw(mainPlotPath);
+				}
+
+				if (this.drawMarkers) {
+					final var pathIterator = mainPlotPath.getPathIterator(null);
+					final var coords = new double[2];
+					var i = 0;
+					final var n = this.markerColors.length;
+					this.markers.clear();
+					while (!pathIterator.isDone()) {
+						pathIterator.currentSegment(coords);
+						final var j = i++ % n;
+						g.setColor(this.markerColors[j]);
+						final var r = this.markerRadius /*- (0.7f * j)*/;
+						final Shape marker = new Ellipse2D.Double(coords[0] - r, coords[1] - r, 2 * r, 2 * r);
+						this.markers.add(marker);
+						g.fill(marker);
+						if (this.markerLineColors != null && this.markerLineColors[j] != null) {
+							g.setColor(this.markerLineColors[j]);
+						}
+						g.draw(marker);
+						pathIterator.next();
+					}
+					if (this.selectedMarker != null) {
+						final var j = this.selectedMarkerIndex % n;
+						g.setColor(this.markerColors[j]);
+						g.fill(this.selectedMarker);
+						g.draw(this.selectedMarker);
+					}
+				}
+			}
+		}
+
 		private void drawTheYAxisLabel(final Graphics2D g, final String text) {
 			final Color oldColor = g.getColor();
 			final String text2 = text/* + " ―→" */;
@@ -414,7 +493,19 @@ public class Plotter6165i extends JInternalFrame {
 					+ stringBounds.getCenterX();
 			final double centerX = stringBounds.getHeight();
 			g.rotate(-Math.PI / 2, centerX, centerY);
-//			g.setColor(Color.BLACK);
+			g.drawString(text2, (float) centerX, (float) centerY);
+			g.rotate(Math.PI / 2, centerX, centerY);
+			g.setColor(oldColor);
+		}
+
+		private void drawTheYAxisLabel2(final Graphics2D g, final String text) {
+			final Color oldColor = g.getColor();
+			g.setColor(yAxisLabelLinearColor);
+			final String text2 = text + " ―→" ;
+			final Rectangle2D stringBounds = g.getFontMetrics().getStringBounds(text2, g);
+			final double centerY = this.getHeight() - Plotter6165i.this.bottom + stringBounds.getMinX();
+			final double centerX = stringBounds.getHeight()+left/2-stringBounds.getHeight();
+			g.rotate(-Math.PI / 2, centerX, centerY);
 			g.drawString(text2, (float) centerX, (float) centerY);
 			g.rotate(Math.PI / 2, centerX, centerY);
 			g.setColor(oldColor);
@@ -514,20 +605,6 @@ public class Plotter6165i extends JInternalFrame {
 		public Color getPlotColor() {
 			return this.plotColor;
 		}
-
-//		private AffineTransform getPlotTransform(final double s, final AffineTransform pan) {
-//			final AffineTransform plotTransform = new AffineTransform(this.transform);
-//			if (Plotter6165i.this.pathToUnitBoxTransform == null) {
-//				Methods2.stacktraceAll("pathToUnitBoxTransform is null");
-//			} else {
-//				plotTransform.concatenate(Plotter6165i.this.pathToUnitBoxTransform);
-//			}
-//			plotTransform.scale(s, s);
-//			if (pan != null) {
-//				plotTransform.concatenate(this.pan);
-//			}
-//			return plotTransform;
-//		}
 
 		/**
 		 * @return the plotStroke
@@ -754,118 +831,48 @@ public class Plotter6165i extends JInternalFrame {
 				/*
 				 * Create a transform which maps the Shape object to the plot window
 				 */
-				if (this.path != null || true) {
 
-					this.plotTransform = this.getPlotTransform(this.sx, this.sy, this.pan);
-					this.plotTransform0 = this.getPlotTransform(1, 1, null);
+				this.plotTransform = this.getPlotTransform(this.sx, this.sy, this.pan);
+				this.plotTransform0 = this.getPlotTransform(1, 1, null);
 
-					final var transformedXGrid = this.plotTransform.createTransformedShape(Plotter6165i.this.xGrid);
-					final var transformedXGrid2 = this.plotTransform.createTransformedShape(Plotter6165i.this.xGrid2);
-					final var transformedXGrid3 = this.plotTransform.createTransformedShape(Plotter6165i.this.xGrid3);
-					final var transformedYGrid = this.plotTransform.createTransformedShape(Plotter6165i.this.yGrid);
-					final var transformedYGrid2 = this.plotTransform.createTransformedShape(Plotter6165i.this.yGrid2);
-					final var transformedYGrid3 = this.plotTransform.createTransformedShape(Plotter6165i.this.yGrid3);
+				final var transformedXGrid = this.plotTransform.createTransformedShape(Plotter6165i.this.xGrid);
+				final var transformedXGrid2 = this.plotTransform.createTransformedShape(Plotter6165i.this.xGrid2);
+				final var transformedXGrid3 = this.plotTransform.createTransformedShape(Plotter6165i.this.xGrid3);
+				final var transformedYGrid = this.plotTransform.createTransformedShape(Plotter6165i.this.yGrid);
+				final var transformedYGrid2 = this.plotTransform.createTransformedShape(Plotter6165i.this.yGrid2);
+				final var transformedYGrid3 = this.plotTransform.createTransformedShape(Plotter6165i.this.yGrid3);
 
-					final var oldColor = g.getColor();
-					g.setColor(Color.BLACK);
+				g.setColor(Color.BLACK);
 
-					final var xBounds = Plotter6165i.this.xGrid.getBounds2D();
-					final var minX = xBounds.getMinX();
-					final var maxX = xBounds.getMaxX();
-					final var sigDigX = (int) (2.4
-							+ Math.log10(Math.max(Math.abs(minX), Math.abs(maxX)) / (maxX - minX)));
-					this.drawXTickLabels(g, Plotter6165i.this.xGrid2.getPathIterator(null), sigDigX);
+				final var xBounds = Plotter6165i.this.xGrid.getBounds2D();
+				final var minX = xBounds.getMinX();
+				final var maxX = xBounds.getMaxX();
+				final var sigDigX = (int) (2.4 + Math.log10(Math.max(Math.abs(minX), Math.abs(maxX)) / (maxX - minX)));
+				this.drawXTickLabels(g, Plotter6165i.this.xGrid2.getPathIterator(null), sigDigX);
 
-					if (Plotter6165i.this.xTicks2 != null) {
-						if (Plotter6165i.this.xTicks2.length < 2) {
-							this.drawXTickLabels(g, Plotter6165i.this.xGrid3.getPathIterator(null), sigDigX);
-						}
-						if (Plotter6165i.this.xTicks2.length + Plotter6165i.this.xTicks3.length < 2) {
-							this.drawXTickLabels(g, Plotter6165i.this.xGrid.getPathIterator(null), sigDigX);
-						}
+				if (Plotter6165i.this.xTicks2 != null) {
+					if (Plotter6165i.this.xTicks2.length < 2) {
+						this.drawXTickLabels(g, Plotter6165i.this.xGrid3.getPathIterator(null), sigDigX);
 					}
-
-					final var yBounds = Plotter6165i.this.yGrid.getBounds2D();
-					final var minY = yBounds.getMinY();
-					final var maxY = yBounds.getMaxY();
-					final var maxAbsY = Math.max(Math.abs(minY), Math.abs(maxY));
-					final var yRange = maxY - minY;
-					final var sigDigY = (int) (2.4 + Math.log10(maxAbsY / yRange));// significant digits for Y tick
-																					// labels
-					this.drawYTickLabels(g, Plotter6165i.this.yGrid2.getPathIterator(null), sigDigY);
-					if (Plotter6165i.this.yTicks2 != null) {
-						if (Plotter6165i.this.yTicks2.length < 2) {
-							this.drawYTickLabels(g, Plotter6165i.this.yGrid3.getPathIterator(null), sigDigY);
-						}
-						if (Plotter6165i.this.yTicks2.length + Plotter6165i.this.yTicks3.length < 2) {
-							this.drawYTickLabels(g, Plotter6165i.this.yGrid.getPathIterator(null), sigDigY);
-						}
+					if (Plotter6165i.this.xTicks2.length + Plotter6165i.this.xTicks3.length < 2) {
+						this.drawXTickLabels(g, Plotter6165i.this.xGrid.getPathIterator(null), sigDigX);
 					}
+				}
 
-					g.setColor(oldColor);
-					g.setClip(this.boundingBox);
-
-					// only!
-					g.draw(transformedXGrid);
-
-					g.draw(transformedYGrid);
-
-					g.setStroke(this.stroke3);
-					g.draw(transformedXGrid3);
-
-					g.draw(transformedYGrid3);
-
-//					g.setColor(g.getColor().darker());
-					g.setStroke(this.stroke2);
-					g.draw(transformedXGrid2);
-					g.draw(transformedYGrid2);
-
-					final Shape pSrc = Plotter6165i.this.semiLog ? (Shape) this.logPath : this.path;
-					final var transformedShape = this.plotTransform.createTransformedShape(pSrc);
-					/*
-					 * If toggleButton 0 is selected, then plot either the main path or its
-					 * logarithm, depending on the value of Plotter6165i.this.semiLog
-					 */
-					final var selected = this.toggleButtons.get(0).isSelected();
-					if (selected) {
-						g.setStroke(this.plotStroke);
-						g.setColor(this.plotColor);
-						if (transformedShape != null) {
-
-							if (this.showMainPlotPath) {
-								g.draw(transformedShape);
-							}
-
-							if (this.drawMarkers) {
-								final var pathIterator = transformedShape.getPathIterator(null);
-								final var coords = new double[2];
-								var i = 0;
-								final var n = this.markerColors.length;
-								this.markers.clear();
-								while (!pathIterator.isDone()) {
-									pathIterator.currentSegment(coords);
-									final var j = i++ % n;
-									g.setColor(this.markerColors[j]);
-									final var r = this.markerRadius /*- (0.7f * j)*/;
-									final Shape marker = new Ellipse2D.Double(coords[0] - r, coords[1] - r, 2 * r,
-											2 * r);
-									this.markers.add(marker);
-									g.fill(marker);
-									if (this.markerLineColors != null && this.markerLineColors[j] != null) {
-										g.setColor(this.markerLineColors[j]);
-									}
-									g.draw(marker);
-									pathIterator.next();
-								}
-								if (this.selectedMarker != null) {
-									final var j = this.selectedMarkerIndex % n;
-									g.setColor(this.markerColors[j]);
-									g.fill(this.selectedMarker);
-									g.draw(this.selectedMarker);
-								}
-							}
-						}
-
+				final var yBounds = Plotter6165i.this.yGrid.getBounds2D();
+				final var minY = yBounds.getMinY();
+				final var maxY = yBounds.getMaxY();
+				final var maxAbsY = Math.max(Math.abs(minY), Math.abs(maxY));
+				final var yRange = maxY - minY;
+				final var sigDigY = (int) (2.4 + Math.log10(maxAbsY / yRange));// significant digits for Y tick
+																				// labels
+				this.drawYTickLabels(g, Plotter6165i.this.yGrid2.getPathIterator(null), sigDigY);
+				if (Plotter6165i.this.yTicks2 != null) {
+					if (Plotter6165i.this.yTicks2.length < 2) {
+						this.drawYTickLabels(g, Plotter6165i.this.yGrid3.getPathIterator(null), sigDigY);
+					}
+					if (Plotter6165i.this.yTicks2.length + Plotter6165i.this.yTicks3.length < 2) {
+						this.drawYTickLabels(g, Plotter6165i.this.yGrid.getPathIterator(null), sigDigY);
 					}
 				}
 
@@ -892,8 +899,11 @@ public class Plotter6165i extends JInternalFrame {
 						}
 					}
 				}
-
 				g.setClip(null);
+
+				this.drawGrids(g, transformedXGrid, transformedXGrid2, transformedXGrid3, transformedYGrid,
+						transformedYGrid2, transformedYGrid3);
+
 				if (Plotter6165i.this.textItems != null) {
 					final var iterator = Plotter6165i.this.textItems2.iterator();
 					while (iterator.hasNext()) {
@@ -908,10 +918,19 @@ public class Plotter6165i extends JInternalFrame {
 				if (Plotter6165i.this.yAxisLabelText != null && !Plotter6165i.this.yAxisLabelText.isEmpty()) {
 					final Color yAxisLabelColor = Plotter6165i.this.semiLog ? Plotter6165i.this.yAxisLabelSemilogColor
 							: Plotter6165i.this.yAxisLabelLinearColor;
-					final Color oldColor = g.getColor();
+					final Color oldColor1 = g.getColor();
 					g.setColor(yAxisLabelColor);
 					this.drawTheYAxisLabel(g, Plotter6165i.this.yAxisLabelText);
-					g.setColor(oldColor);
+					g.setColor(oldColor1);
+				}
+
+				if (Plotter6165i.this.yAxisLabelText2 != null && !Plotter6165i.this.yAxisLabelText2.isEmpty()) {
+					final Color yAxisLabelColor = Plotter6165i.this.semiLog ? Plotter6165i.this.yAxisLabelSemilogColor
+							: Plotter6165i.this.yAxisLabelLinearColor;
+					final Color oldColor1 = g.getColor();
+					g.setColor(yAxisLabelColor);
+					this.drawTheYAxisLabel2(g, Plotter6165i.this.yAxisLabelText2);
+					g.setColor(oldColor1);
 				}
 
 				for (final LegendItem li : Plotter6165i.this.legendItems) {
@@ -951,7 +970,6 @@ public class Plotter6165i extends JInternalFrame {
 					area.setWrapStyleWord(true);
 					area.setLineWrap(true);
 					area.setInheritsPopupMenu(true);
-//					area.setOpaque(true);
 					final var textAreaLeftx = (int) (Double.isNaN(li.x) ? this.insets.left + w - maxWidth
 							: this.plotTransform0.transform(new Point2D.Double(li.x, 0), null).getX());
 					final var textAreaTopy = (int) (Double.isNaN(li.y) ? this.insets.top
@@ -962,6 +980,21 @@ public class Plotter6165i extends JInternalFrame {
 							: -li.h * this.plotTransform0.getScaleY());
 					area.setBounds(textAreaLeftx, textAreaTopy, textAreaWidth, textAreaHeight);
 				}
+
+				/*
+				 * If toggleButton 0 is selected, then plot either the main path or its
+				 * logarithm, depending on the value of Plotter6165i.this.semiLog
+				 */
+				final var selected = this.toggleButtons.get(0).isSelected();
+				final Shape pSrc = Plotter6165i.this.semiLog ? (Shape) this.logPath : this.path;
+				final var transformedShape = this.plotTransform.createTransformedShape(pSrc);
+				if (selected) {
+					final Shape oldClip = g.getClip();
+					g.setClip(this.boundingBox);
+					this.drawMainPlotPath(g, transformedShape);
+					g.setClip(oldClip);
+				}
+
 				super.paintChildren(g);
 			} catch (final Exception e) {
 				e.printStackTrace();
@@ -1511,6 +1544,8 @@ public class Plotter6165i extends JInternalFrame {
 
 	public String yAxisLabelText;
 
+	private String yAxisLabelText2;
+
 	private final Path2D yGrid = new Path2D.Double();
 
 	private final Path2D yGrid2 = new Path2D.Double();
@@ -1984,6 +2019,13 @@ public class Plotter6165i extends JInternalFrame {
 	}
 
 	/**
+	 * @return the yAxisLabelText2
+	 */
+	public String getyAxisLabelText2() {
+		return this.yAxisLabelText2;
+	}
+
+	/**
 	 * @param desktop
 	 */
 	private void init() {
@@ -2366,6 +2408,13 @@ public class Plotter6165i extends JInternalFrame {
 	 */
 	public void setxTickHeight(final int xTickHeight) {
 		this.plotterPane.setxTickHeight(xTickHeight);
+	}
+
+	/**
+	 * @param yAxisLabelText2 the yAxisLabelText2 to set
+	 */
+	public void setyAxisLabelText2(final String yAxisLabelText2) {
+		this.yAxisLabelText2 = yAxisLabelText2;
 	}
 
 	protected void shutdown() {

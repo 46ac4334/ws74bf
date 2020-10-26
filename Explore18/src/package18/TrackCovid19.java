@@ -1,5 +1,6 @@
 package package18;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -60,7 +61,7 @@ import package18.SevenDayAverage.EndPad;
 import package18.SevenDayAverage.StartPad;
 
 /**
- * @author bakis
+ * @author 46ac4334
  *
  */
 public class TrackCovid19 extends JFrame implements Runnable {
@@ -68,7 +69,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	/**
 	 * Type of administrative division
 	 *
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	public enum ADMIN {
@@ -89,7 +90,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 * Westchester, ‎Multnomah.</dd>
 	 * </dl>
 	 *
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	@SuppressWarnings("unused")
@@ -116,7 +117,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		 * <code>admin2</code>.
 		 * </p>
 		 *
-		 * @author bakis
+		 * @author 46ac4334
 		 *
 		 */
 		private static class Key implements Comparable<Key> {
@@ -474,7 +475,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	/**
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	private class ControlPanel extends JInternalFrame {
@@ -527,7 +528,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	/**
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	public class GetDataForRegion {
@@ -541,7 +542,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	/**
 	 * The icon for this application.
 	 *
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	public static final class Icon1 extends BufferedImage {
@@ -570,7 +571,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	}
 
 	/**
-	 * @author bakis
+	 * @author 46ac4334
 	 *
 	 */
 	public class JButton2 extends JToggleButton implements Comparable<JButton2> {
@@ -801,6 +802,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		EventQueue.invokeLater(app);
 	}
 
+	private final Color areaColor = Color.getHSBColor(0f, 0.05f, 0.9f);
+
 	private boolean buildStateHeaderList = true;
 
 	private final File confirmedGlobalFile;
@@ -835,7 +838,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 	private List<CSVRecord> deathsUSRecords;
 
-	private final Dimension defaultPlotterSize = new Dimension(468, 375);
+	// private final Dimension defaultPlotterSize = new Dimension(468, 375);
+	private final Dimension defaultPlotterSize = new Dimension(468, 353);
 
 	/**
 	 * The desktop on which the charts and tables will be displayed
@@ -1098,9 +1102,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 //		showPlot.getPlotterPane().    setSemiLog(false);
 
-		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(countryName + ", per 100K", cumulativeCounts,
+		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(countryName , cumulativeCounts,
 				button.population * 1e-5);
-		showNormalizedPlot.setCaptionText(String.format("per 100K. Population %,d", button.population));
+		showNormalizedPlot.setCaptionText(String.format("Population %,d", button.population));
 
 		return;
 	}
@@ -1125,8 +1129,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 //		showPlot.getPlotterPane().    setSemiLog(false);
 
 		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(
-				countyName + " county of " + stateName + ", per 100K", cumulativeCounts, button.population * 1e-5);
-		showNormalizedPlot.setCaptionText(String.format("per 100K. Population %,d", button.population));
+				countyName + " county, " + stateName , cumulativeCounts,
+				button.population * 1e-5);
+		showNormalizedPlot.setCaptionText(String.format("Population %,d", button.population));
 		return;
 	}
 
@@ -1168,9 +1173,9 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		}
 //		this.showPlot(String.format("%s (pop. %,d)", stateName, button.population), cumulativeCounts);
 
-		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(stateName + ", per 100K", cumulativeCounts,
+		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(stateName , cumulativeCounts,
 				button.population * 1e-5);
-		showNormalizedPlot.setCaptionText(String.format("per 100K. Population %,d", button.population));
+		showNormalizedPlot.setCaptionText(String.format("Population %,d", button.population));
 		return;
 
 	}
@@ -1407,7 +1412,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private void createCountryButtonsPanel() {
 		final var countryButtons = new ControlPanel("Countries", null);
 		this.desktop.add(countryButtons);
-		countryButtons.setPreferredSize(new Dimension(860, 800));
+		countryButtons.setPreferredSize(new Dimension(860, 820));
 		countryButtons.setResizable(false);
 		final var countryButtonsPanel = new JPanel();
 		countryButtonsPanel.setLayout(new FlowLayout());
@@ -1591,6 +1596,19 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			} else {
 			}
 		}
+
+		List<CSVRecord> records;
+
+		records = this.lookupRecords;
+		System.out.format("%n%s%n", "lookup");
+		this.printPopulations(countryName, records);
+
+		records = this.deathsUSRecords;
+		System.out.format("%n%s%n", "deaths US");
+		this.printPopulations(countryName, records);
+
+		System.out.println();
+
 		return result;
 	}
 
@@ -1744,8 +1762,6 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	 */
 	long getPopulation(final String name) {//
 
-		System.out.println(StaticMethods.stacktraceAll("tracing"));
-
 		/*
 		 * Compile a list of all entities mentioned
 		 */
@@ -1783,6 +1799,108 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		return result;
 
 	}// end of getPopulation
+
+	/**
+	 * @param country Name of the country or region. Must be specified, can not be
+	 *                empty.
+	 * @param state   Name of the province or state. If "*", sums over all non-blank
+	 *                states. If blank, reads only rows where the Province/State
+	 *                column is blank or absent.
+	 * @param county  Name of the Admin2 entity. If "*", sums over all non-blank
+	 *                counties. If blank, reads only rows where the Admin2 column is
+	 *                blank or absent.
+	 * @param records
+	 * @return The total population in the area or areas specified by the first
+	 *         three arguments as described above.
+	 */
+	private long[] getPopulation(final String country, final String state, final String county,
+			final List<CSVRecord> records) {
+
+		final List<String> msgs = new ArrayList<>();
+		if (country == null) {
+			msgs.add("first argument \"country\" is null.");
+		} else if (country.isBlank()) {
+			msgs.add("first argument \"country\" is blank.");
+		}
+		if (county != null && !county.isBlank() && (state == null || state.isBlank())) {
+			msgs.add(String.format("County is specified as \"%s\" but state is missing.", county));
+		}
+		if (records == null) {
+			msgs.add("Fourth argument \"records\" is null.");
+		} else if (records.isEmpty()) {
+			msgs.add("Fourth argument \"records\" is empty.");
+		}
+
+		if (!msgs.isEmpty()) {
+			for (final String msg : msgs) {
+				System.err.println(msg);
+			}
+			throw new IllegalArgumentException("See above message(s).");
+		}
+
+		final boolean PopulationMapped = records.get(0).isMapped("Population");
+		if (!PopulationMapped) {
+			msgs.add("the CSV records do not contain a \"Population\" column.");
+		}
+		final boolean provinceStateMapped = records.get(0).isMapped("Province/State");
+		final boolean province_StateMapped = records.get(0).isMapped("Province_State");
+
+		final boolean countryRegionMapped = records.get(0).isMapped("Country/Region");
+		final boolean country_RegionMapped = records.get(0).isMapped("Country_Region");
+		if (!countryRegionMapped && !country_RegionMapped) {
+			msgs.add("Neither Country/Region nor Country_Region column found");
+		}
+
+		final boolean admin2Mapped = records.get(0).isMapped("Admin2");
+		if (county != null && !county.isBlank() && !admin2Mapped) {
+			msgs.add(String.format("County \"%s\" specified, but no Admin2 column", county));
+		}
+
+		if (state != null && !state.isBlank() && !provinceStateMapped && !province_StateMapped) {
+			msgs.add(String.format("State or province \"%s\" specified, but no such column", state));
+		}
+
+		if (!msgs.isEmpty()) {
+			for (final String msg : msgs) {
+				System.err.println(msg);
+			}
+			throw new IllegalArgumentException("See above message(s).");
+		}
+
+		long result = 0;
+		int count = 0;
+
+		for (final CSVRecord r : records) {
+
+			final boolean countryMatches = country.contentEquals("*")
+					|| country.contentEquals(r.get(countryRegionMapped ? "Country/Region" : "Country_Region"));
+			if (countryMatches) {
+				final String stateString = province_StateMapped ? r.get("Province_State")
+						: provinceStateMapped ? r.get("Province/State") : null;
+
+				final boolean stateMatches = this.targetMatch(state, stateString);
+
+				if (stateMatches) {
+					final String countyString = admin2Mapped ? r.get("Admin2") : null;
+
+					final boolean countyMatches = this.targetMatch(county, countyString);
+
+					if (countyMatches) {
+						final String popString = r.get("Population");
+						if (popString != null && !popString.isBlank()) {
+							final long pop = Long.parseLong(popString);
+							result += pop;
+							++count;
+						}
+					}
+				}
+
+			}
+		}
+
+		return new long[] { result, count };
+
+	}// end of getPopulation(final String country, final String State, final String
 
 	/**
 	 * Calculates the population of the country by summing all entries in the lookup
@@ -1943,6 +2061,24 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		this.buildStateHeaderList = false;
 	}
 
+	/**
+	 * @param countryName
+	 * @param records
+	 */
+	private void printPopulations(final String countryName, final List<CSVRecord> records) {
+		long[] population;
+		population = this.getPopulation(countryName, null, null, records);// TODO for testing only!!!
+		System.out.format("1) Population of %s, null, null is %,d, count = %,d%n", countryName, population[0],
+				population[1]);
+
+		population = this.getPopulation(countryName, "*", null, records);// TODO for testing only!!!
+		System.out.format("2) Population of %s, *, null is %,d, count = %,d%n", countryName, population[0],
+				population[1]);
+
+		population = this.getPopulation(countryName, "*", "*", records);// TODO for testing only!!!
+		System.out.format("3) Population of %s, *, * is %,d, count = %,d%n", countryName, population[0], population[1]);
+	}
+
 	public Object removeFromPool(final JButton2 jButton2) {
 		this.pool.remove(jButton2);
 		this.showPool();
@@ -2089,6 +2225,10 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		dailyPath.moveTo(0, 0);
 		final var hypoPath = new Path2D.Double();
 		hypoPath.moveTo(0, 0);
+		final var barPath = new Path2D.Double();
+		barPath.moveTo(0, 0);
+		final var areaPath = new Path2D.Double();
+		areaPath.moveTo(0, 0);
 		var i = 0;
 		Integer oldCumul = 0;
 		final List<Number> dailyCounts = new ArrayList<>();
@@ -2098,9 +2238,15 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			dailyCounts.add(dailyCount);
 			cumulPath.lineTo(i, cumulCount / norm);
 			dailyPath.lineTo(i, dailyCount / norm);
+			barPath.moveTo(i, 0);
+			barPath.lineTo(i, dailyCount / norm);
+			areaPath.lineTo(i - 0.5, dailyCount / norm);
+			areaPath.lineTo(i + 0.5, dailyCount / norm);
 			oldCumul = cumulCount;
 			++i;
 		}
+		areaPath.lineTo(i - 0.5, 0);
+		areaPath.lineTo(0, 0);
 		final var hypothesizedRates = this.hypothesize(dailyCounts);
 		final var iterator = hypothesizedRates.iterator();
 		i = 0;
@@ -2110,11 +2256,12 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			++i;
 		}
 //		plotter.setMainPlotPath(cumulPath);
-//		plotter.addPlotPath(Color.red.darker(), dailyPath, new BasicStroke(1));
 //		plotter.addPlotPath(Color.green.darker(), hypoPath, new BasicStroke(1.5f));
 //		plotter.setSemiLog(true);
+		plotter.setyAxisLabelText2("Daily new cases per 100K");
 		plotter.setMainPlotPath(hypoPath);
 		plotter.zoomToYrange(0, 30);
+		plotter.addPlotPath(new BasicStroke(1.0f), areaPath, null, this.areaColor);
 
 		plotter.setIconifiable(true);
 		plotter.setPlotTitle(name);
@@ -2332,4 +2479,34 @@ public class TrackCovid19 extends JFrame implements Runnable {
 			this.dispose();
 		}
 	}
+
+	/**
+	 * Match is <code>true</code> if and only if one of these conditions is
+	 * satisfied:
+	 * <ul>
+	 * <li><code>target</code> is empty and <code>testString</code> is empty</li>
+	 * <li><code>target</code> is <code>"*"</code> and <code>testString</code> is
+	 * not empty</li>
+	 * <li><code>target</code> is not empty and is not <code>"*"</code>, and matches
+	 * the <code>testString</code> exactly.</li>
+	 * </ul>
+	 * In the above description, a <code>String</code> is considered empty if and
+	 * only if it is either <code>null</code> or has length zero or contains only
+	 * whitespace characters.
+	 *
+	 * @param target     The name of the region or <code>"*"</code>
+	 * @param testString The name being tested
+	 * @return true if match conditions are met.
+	 */
+	private boolean targetMatch(final String target, final String testString) {
+		final boolean stateSpecifiedAsAsterisk = target != null && target.contentEquals("*");
+		final boolean stateMatchesAsterisk = stateSpecifiedAsAsterisk && testString != null && !testString.isBlank();
+		final boolean stateMatchesNull = (target == null || target.isBlank())
+				&& (testString == null || testString.isBlank());
+		final boolean stateMatchesExactly = target != null && !target.isBlank() && testString != null
+				&& !testString.isBlank() && testString.contentEquals(target);
+		final boolean stateMatches = stateMatchesAsterisk || stateMatchesNull || stateMatchesExactly;
+		return stateMatches;
+	}
+
 }
