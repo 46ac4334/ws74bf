@@ -1102,7 +1102,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 //		showPlot.getPlotterPane().    setSemiLog(false);
 
-		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(countryName , cumulativeCounts,
+		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(countryName, cumulativeCounts,
 				button.population * 1e-5);
 		showNormalizedPlot.setCaptionText(String.format("Population %,d", button.population));
 
@@ -1128,9 +1128,8 @@ public class TrackCovid19 extends JFrame implements Runnable {
 
 //		showPlot.getPlotterPane().    setSemiLog(false);
 
-		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(
-				countyName + " county, " + stateName , cumulativeCounts,
-				button.population * 1e-5);
+		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(countyName + " county, " + stateName,
+				cumulativeCounts, button.population * 1e-5);
 		showNormalizedPlot.setCaptionText(String.format("Population %,d", button.population));
 		return;
 	}
@@ -1173,7 +1172,7 @@ public class TrackCovid19 extends JFrame implements Runnable {
 		}
 //		this.showPlot(String.format("%s (pop. %,d)", stateName, button.population), cumulativeCounts);
 
-		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(stateName , cumulativeCounts,
+		final Plotter6165i showNormalizedPlot = this.showNormalizedPlot(stateName, cumulativeCounts,
 				button.population * 1e-5);
 		showNormalizedPlot.setCaptionText(String.format("Population %,d", button.population));
 		return;
@@ -1568,14 +1567,18 @@ public class TrackCovid19 extends JFrame implements Runnable {
 	private Map<String, Set<Long>> getCountryNames(final Map<String, Integer> headerMap,
 			final List<CSVRecord> records) {
 		final var columnIndex = headerMap.get("Country/Region");
+		if (columnIndex == null) {
+			throw new RuntimeException("no Country/Region column");
+		}
 		final Map<String, Set<Long>> result = new TreeMap<>();
 		for (final CSVRecord r : records) {
-			final var rowIndex = r.getRecordNumber();
-			final var countryName = r.get(columnIndex);
-
-			final var value = result.containsKey(countryName) ? result.get(countryName) : new TreeSet<Long>();
-			value.add(rowIndex);
-			result.put(countryName, value);
+			if (r.size() > columnIndex) {
+				final var rowIndex = r.getRecordNumber();
+				final var countryName = r.get(columnIndex);
+				final var value = result.containsKey(countryName) ? result.get(countryName) : new TreeSet<Long>();
+				value.add(rowIndex);
+				result.put(countryName, value);
+			}
 		}
 		return result;
 	}
